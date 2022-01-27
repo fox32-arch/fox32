@@ -15,7 +15,7 @@ pub struct Memory {
     pub overlays: Arc<Mutex<Vec<Overlay>>>,
 }
 
-impl Memory { // TODO: make this a trait, so the application can implement read_memory and write_memory itself
+impl Memory {
     pub fn new(size: u32, shared_memory: Arc<Mutex<Vec<u8>>>, overlays: Arc<Mutex<Vec<Overlay>>>, read_only_memory: Vec<u8>) -> Self {
         Memory {
             ram: vec![0; size as usize],
@@ -151,10 +151,9 @@ pub enum Interrupt {
 
 pub struct CPU {
     pub instruction_pointer: u32,
+    pub stack_pointer: u32,
 
-    // 0-31: r0-r31
-    // 32:   rsp
-    pub register: [u32; 33],
+    pub register: [u32; 32],
     pub flag: Flag,
     pub halted: bool,
     pub interrupts_enabled: bool,
@@ -167,7 +166,8 @@ impl CPU {
     pub fn new(bus: Bus) -> Self {
         CPU {
             instruction_pointer: 0xF0000000,
-            register: [0; 33],
+            stack_pointer: 0x02000000,
+            register: [0; 32],
             flag: Flag { zero: false, carry: false },
             halted: false,
             interrupts_enabled: false,
@@ -191,14 +191,14 @@ impl CPU {
         let mut instruction_pointer_offset = 2; // increment past opcode half
         let source_value = match source {
             Operand::Register => {
-                let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
-                let value = self.register[register];
+                let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
+                let value = self.read_register(register);
                 instruction_pointer_offset += 1; // increment past 8 bit register number
                 value
             }
             Operand::RegisterPtr => {
-                let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
-                let pointer = self.register[register];
+                let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
+                let pointer = self.read_register(register);
                 let value = self.bus.memory.read_32(pointer);
                 instruction_pointer_offset += 1; // increment past 8 bit register number
                 value
@@ -227,11 +227,19 @@ impl CPU {
         };
         (source_value, instruction_pointer_offset)
     }
-    pub fn read_register(self, register: u8) -> u32 {
-        self.register[register as usize]
+    pub fn read_register(&self, register: u8) -> u32 {
+        match register {
+            0..=31 => self.register[register as usize],
+            32 => self.stack_pointer,
+            _ => panic!("Invalid register: {}", register),
+        }
     }
     pub fn write_register(&mut self, register: u8, word: u32) {
-        self.register[register as usize] = word;
+        match register {
+            0..=31 => self.register[register as usize] = word,
+            32 => self.stack_pointer = word,
+            _ => panic!("Invalid register: {}", register),
+        };
     }
     pub fn print_registers(&mut self) {
         for index in 0..2 {
@@ -250,54 +258,54 @@ impl CPU {
                 index + 24, self.register[index + 24]
             );
         }
-        println!("rsp: {:#010X}", self.register[32]);
+        println!("rsp: {:#010X}", self.stack_pointer);
     }
     pub fn push_stack_8(&mut self, byte: u8) {
-        let decremented_stack_pointer = self.register[32].overflowing_sub(1);
-        self.register[32] = decremented_stack_pointer.0;
+        let decremented_stack_pointer = self.stack_pointer.overflowing_sub(1);
+        self.stack_pointer = decremented_stack_pointer.0;
         if decremented_stack_pointer.1 {
             // TODO: stack overflow exception
         }
-        self.bus.memory.write_8(self.register[32], byte);
+        self.bus.memory.write_8(self.stack_pointer, byte);
     }
     pub fn pop_stack_8(&mut self) -> u8 {
-        let byte = self.bus.memory.read_8(self.register[32]);
-        let incremented_stack_pointer = self.register[32].overflowing_add(1);
-        self.register[32] = incremented_stack_pointer.0;
+        let byte = self.bus.memory.read_8(self.stack_pointer);
+        let incremented_stack_pointer = self.stack_pointer.overflowing_add(1);
+        self.stack_pointer = incremented_stack_pointer.0;
         if incremented_stack_pointer.1 {
             // TODO: stack overflow exception
         }
         byte
     }
     pub fn push_stack_16(&mut self, half: u16) {
-        let decremented_stack_pointer = self.register[32].overflowing_sub(2);
-        self.register[32] = decremented_stack_pointer.0;
+        let decremented_stack_pointer = self.stack_pointer.overflowing_sub(2);
+        self.stack_pointer = decremented_stack_pointer.0;
         if decremented_stack_pointer.1 {
             // TODO: stack overflow exception
         }
-        self.bus.memory.write_16(self.register[32], half);
+        self.bus.memory.write_16(self.stack_pointer, half);
     }
     pub fn pop_stack_16(&mut self) -> u16 {
-        let half = self.bus.memory.read_16(self.register[32]);
-        let incremented_stack_pointer = self.register[32].overflowing_add(2);
-        self.register[32] = incremented_stack_pointer.0;
+        let half = self.bus.memory.read_16(self.stack_pointer);
+        let incremented_stack_pointer = self.stack_pointer.overflowing_add(2);
+        self.stack_pointer = incremented_stack_pointer.0;
         if incremented_stack_pointer.1 {
             // TODO: stack overflow exception
         }
         half
     }
     pub fn push_stack_32(&mut self, word: u32) {
-        let decremented_stack_pointer = self.register[32].overflowing_sub(4);
-        self.register[32] = decremented_stack_pointer.0;
+        let decremented_stack_pointer = self.stack_pointer.overflowing_sub(4);
+        self.stack_pointer = decremented_stack_pointer.0;
         if decremented_stack_pointer.1 {
             // TODO: stack overflow exception
         }
-        self.bus.memory.write_32(self.register[32], word);
+        self.bus.memory.write_32(self.stack_pointer, word);
     }
     pub fn pop_stack_32(&mut self) -> u32 {
-        let word = self.bus.memory.read_32(self.register[32]);
-        let incremented_stack_pointer = self.register[32].overflowing_add(4);
-        self.register[32] = incremented_stack_pointer.0;
+        let word = self.bus.memory.read_32(self.stack_pointer);
+        let incremented_stack_pointer = self.stack_pointer.overflowing_add(4);
+        self.stack_pointer = incremented_stack_pointer.0;
         if incremented_stack_pointer.1 {
             // TODO: stack overflow exception
         }
@@ -397,28 +405,28 @@ impl CPU {
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    let result = (self.register[register] as u8).overflowing_add(source_value as u8);
-                                    self.register[register] = (self.register[register] & 0xFFFFFF00) | (result.0 as u32);
+                                    let result = (self.read_register(register) as u8).overflowing_add(source_value as u8);
+                                    self.write_register(register, (self.read_register(register) & 0xFFFFFF00) | (result.0 as u32));
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    let result = (self.register[register] as u16).overflowing_add(source_value as u16);
-                                    self.register[register] = (self.register[register] & 0xFFFF0000) | (result.0 as u32);
+                                    let result = (self.read_register(register) as u16).overflowing_add(source_value as u16);
+                                    self.write_register(register, (self.read_register(register) & 0xFFFF0000) | (result.0 as u32));
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    let result = (self.register[register]).overflowing_add(source_value);
-                                    self.register[register] = result.0;
+                                    let result = self.read_register(register).overflowing_add(source_value);
+                                    self.write_register(register, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -427,8 +435,8 @@ impl CPU {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
-                        let pointer = self.register[register];
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(pointer).overflowing_add(source_value as u8);
@@ -496,28 +504,28 @@ impl CPU {
                 let should_run = self.check_condition(condition);
                 match source {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    let result = (self.register[register] as u8).overflowing_add(1);
-                                    self.register[register] = (self.register[register] & 0xFFFFFF00) | (result.0 as u32);
+                                    let result = (self.read_register(register) as u8).overflowing_add(1);
+                                    self.write_register(register, (self.read_register(register) & 0xFFFFFF00) | (result.0 as u32));
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    let result = (self.register[register] as u16).overflowing_add(1);
-                                    self.register[register] = (self.register[register] & 0xFFFF0000) | (result.0 as u32);
+                                    let result = (self.read_register(register) as u16).overflowing_add(1);
+                                    self.write_register(register, (self.read_register(register) & 0xFFFF0000) | (result.0 as u32));
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    let result = (self.register[register]).overflowing_add(1);
-                                    self.register[register] = result.0;
+                                    let result = self.read_register(register).overflowing_add(1);
+                                    self.write_register(register, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -526,8 +534,8 @@ impl CPU {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
-                        let pointer = self.register[register];
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
                                 if should_run {
@@ -595,28 +603,28 @@ impl CPU {
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    let result = (self.register[register] as u8).overflowing_sub(source_value as u8);
-                                    self.register[register] = (self.register[register] & 0xFFFFFF00) | (result.0 as u32);
+                                    let result = (self.read_register(register) as u8).overflowing_sub(source_value as u8);
+                                    self.write_register(register, (self.read_register(register) & 0xFFFFFF00) | (result.0 as u32));
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    let result = (self.register[register] as u16).overflowing_sub(source_value as u16);
-                                    self.register[register] = (self.register[register] & 0xFFFF0000) | (result.0 as u32);
+                                    let result = (self.read_register(register) as u16).overflowing_sub(source_value as u16);
+                                    self.write_register(register, (self.read_register(register) & 0xFFFF0000) | (result.0 as u32));
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    let result = (self.register[register]).overflowing_sub(source_value);
-                                    self.register[register] = result.0;
+                                    let result = self.read_register(register).overflowing_sub(source_value);
+                                    self.write_register(register, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -625,8 +633,8 @@ impl CPU {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
-                        let pointer = self.register[register];
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(pointer).overflowing_sub(source_value as u8);
@@ -694,28 +702,28 @@ impl CPU {
                 let should_run = self.check_condition(condition);
                 match source {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    let result = (self.register[register] as u8).overflowing_sub(1);
-                                    self.register[register] = (self.register[register] & 0xFFFFFF00) | (result.0 as u32);
+                                    let result = (self.read_register(register) as u8).overflowing_sub(1);
+                                    self.write_register(register, (self.read_register(register) & 0xFFFFFF00) | (result.0 as u32));
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    let result = (self.register[register] as u16).overflowing_sub(1);
-                                    self.register[register] = (self.register[register] & 0xFFFF0000) | (result.0 as u32);
+                                    let result = (self.read_register(register) as u16).overflowing_sub(1);
+                                    self.write_register(register, (self.read_register(register) & 0xFFFF0000) | (result.0 as u32));
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    let result = (self.register[register]).overflowing_sub(1);
-                                    self.register[register] = result.0;
+                                    let result = self.read_register(register).overflowing_sub(1);
+                                    self.write_register(register, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -724,8 +732,8 @@ impl CPU {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
-                        let pointer = self.register[register];
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
                                 if should_run {
@@ -793,28 +801,28 @@ impl CPU {
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    let result = (self.register[register] as u8).overflowing_mul(source_value as u8);
-                                    self.register[register] = (self.register[register] & 0xFFFFFF00) | (result.0 as u32);
+                                    let result = (self.read_register(register) as u8).overflowing_mul(source_value as u8);
+                                    self.write_register(register, (self.read_register(register) & 0xFFFFFF00) | (result.0 as u32));
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    let result = (self.register[register] as u16).overflowing_mul(source_value as u16);
-                                    self.register[register] = (self.register[register] & 0xFFFF0000) | (result.0 as u32);
+                                    let result = (self.read_register(register) as u16).overflowing_mul(source_value as u16);
+                                    self.write_register(register, (self.read_register(register) & 0xFFFF0000) | (result.0 as u32));
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    let result = (self.register[register]).overflowing_mul(source_value);
-                                    self.register[register] = result.0;
+                                    let result = self.read_register(register).overflowing_mul(source_value);
+                                    self.write_register(register, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -823,8 +831,8 @@ impl CPU {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
-                        let pointer = self.register[register];
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(pointer).overflowing_mul(source_value as u8);
@@ -892,26 +900,26 @@ impl CPU {
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    let result = (self.register[register] as u8).pow(source_value);
-                                    self.register[register] = (self.register[register] & 0xFFFFFF00) | (result as u32);
+                                    let result = (self.read_register(register) as u8).pow(source_value);
+                                    self.write_register(register, (self.read_register(register) & 0xFFFFFF00) | (result as u32));
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    let result = (self.register[register] as u16).pow(source_value);
-                                    self.register[register] = (self.register[register] & 0xFFFF0000) | (result as u32);
+                                    let result = (self.read_register(register) as u16).pow(source_value);
+                                    self.write_register(register, (self.read_register(register) & 0xFFFF0000) | (result as u32));
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    let result = (self.register[register]).pow(source_value);
-                                    self.register[register] = result;
+                                    let result = self.read_register(register).pow(source_value);
+                                    self.write_register(register, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
@@ -919,8 +927,8 @@ impl CPU {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
-                        let pointer = self.register[register];
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(pointer).pow(source_value);
@@ -982,28 +990,28 @@ impl CPU {
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    let result = (self.register[register] as u8).overflowing_div(source_value as u8);
-                                    self.register[register] = (self.register[register] & 0xFFFFFF00) | (result.0 as u32);
+                                    let result = (self.read_register(register) as u8).overflowing_div(source_value as u8);
+                                    self.write_register(register, (self.read_register(register) & 0xFFFFFF00) | (result.0 as u32));
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    let result = (self.register[register] as u16).overflowing_div(source_value as u16);
-                                    self.register[register] = (self.register[register] & 0xFFFF0000) | (result.0 as u32);
+                                    let result = (self.read_register(register) as u16).overflowing_div(source_value as u16);
+                                    self.write_register(register, (self.read_register(register) & 0xFFFF0000) | (result.0 as u32));
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    let result = (self.register[register]).overflowing_div(source_value);
-                                    self.register[register] = result.0;
+                                    let result = self.read_register(register).overflowing_div(source_value);
+                                    self.write_register(register, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -1012,8 +1020,8 @@ impl CPU {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
-                        let pointer = self.register[register];
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(pointer).overflowing_div(source_value as u8);
@@ -1081,26 +1089,26 @@ impl CPU {
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    let result = (self.register[register] as u8) % source_value as u8;
-                                    self.register[register] = (self.register[register] & 0xFFFFFF00) | (result as u32);
+                                    let result = (self.read_register(register) as u8) % source_value as u8;
+                                    self.write_register(register, (self.read_register(register) & 0xFFFFFF00) | (result as u32));
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    let result = (self.register[register] as u16) % source_value as u16;
-                                    self.register[register] = (self.register[register] & 0xFFFF0000) | (result as u32);
+                                    let result = (self.read_register(register) as u16) % source_value as u16;
+                                    self.write_register(register, (self.read_register(register) & 0xFFFF0000) | (result as u32));
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    let result = (self.register[register]) % source_value;
-                                    self.register[register] = result;
+                                    let result = self.read_register(register) % source_value;
+                                    self.write_register(register, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
@@ -1108,8 +1116,8 @@ impl CPU {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
-                        let pointer = self.register[register];
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(pointer) % source_value as u8;
@@ -1172,26 +1180,26 @@ impl CPU {
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    let result = (self.register[register] as u8) & source_value as u8;
-                                    self.register[register] = (self.register[register] & 0xFFFFFF00) | (result as u32);
+                                    let result = (self.read_register(register) as u8) & source_value as u8;
+                                    self.write_register(register, (self.read_register(register) & 0xFFFFFF00) | (result as u32));
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    let result = (self.register[register] as u16) & source_value as u16;
-                                    self.register[register] = (self.register[register] & 0xFFFF0000) | (result as u32);
+                                    let result = (self.read_register(register) as u16) & source_value as u16;
+                                    self.write_register(register, (self.read_register(register) & 0xFFFF0000) | (result as u32));
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    let result = (self.register[register]) & source_value;
-                                    self.register[register] = result;
+                                    let result = self.read_register(register) & source_value;
+                                    self.write_register(register, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
@@ -1199,8 +1207,8 @@ impl CPU {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
-                        let pointer = self.register[register];
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(pointer) & source_value as u8;
@@ -1262,26 +1270,26 @@ impl CPU {
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    let result = (self.register[register] as u8) | source_value as u8;
-                                    self.register[register] = (self.register[register] & 0xFFFFFF00) | (result as u32);
+                                    let result = (self.read_register(register) as u8) | source_value as u8;
+                                    self.write_register(register, (self.read_register(register) & 0xFFFFFF00) | (result as u32));
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    let result = (self.register[register] as u16) | source_value as u16;
-                                    self.register[register] = (self.register[register] & 0xFFFF0000) | (result as u32);
+                                    let result = (self.read_register(register) as u16) | source_value as u16;
+                                    self.write_register(register, (self.read_register(register) & 0xFFFF0000) | (result as u32));
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    let result = (self.register[register]) | source_value;
-                                    self.register[register] = result;
+                                    let result = self.read_register(register) | source_value;
+                                    self.write_register(register, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
@@ -1289,8 +1297,8 @@ impl CPU {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
-                        let pointer = self.register[register];
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(pointer) | source_value as u8;
@@ -1352,26 +1360,26 @@ impl CPU {
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    let result = (self.register[register] as u8) ^ source_value as u8;
-                                    self.register[register] = (self.register[register] & 0xFFFFFF00) | (result as u32);
+                                    let result = (self.read_register(register) as u8) ^ source_value as u8;
+                                    self.write_register(register, (self.read_register(register) & 0xFFFFFF00) | (result as u32));
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    let result = (self.register[register] as u16) ^ source_value as u16;
-                                    self.register[register] = (self.register[register] & 0xFFFF0000) | (result as u32);
+                                    let result = (self.read_register(register) as u16) ^ source_value as u16;
+                                    self.write_register(register, (self.read_register(register) & 0xFFFF0000) | (result as u32));
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    let result = (self.register[register]) ^ source_value;
-                                    self.register[register] = result;
+                                    let result = self.read_register(register) ^ source_value;
+                                    self.write_register(register, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
@@ -1379,8 +1387,8 @@ impl CPU {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
-                        let pointer = self.register[register];
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(pointer) ^ source_value as u8;
@@ -1442,26 +1450,26 @@ impl CPU {
                 let should_run = self.check_condition(condition);
                 match source {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    let result = !self.register[register] as u8;
-                                    self.register[register] = (self.register[register] & 0xFFFFFF00) | (result as u32);
+                                    let result = !self.read_register(register) as u8;
+                                    self.write_register(register, (self.read_register(register) & 0xFFFFFF00) | (result as u32));
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    let result = !self.register[register] as u16;
-                                    self.register[register] = (self.register[register] & 0xFFFF0000) | (result as u32);
+                                    let result = !self.read_register(register) as u16;
+                                    self.write_register(register, (self.read_register(register) & 0xFFFF0000) | (result as u32));
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    let result = !self.register[register];
-                                    self.register[register] = result;
+                                    let result = !self.read_register(register);
+                                    self.write_register(register, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
@@ -1469,8 +1477,8 @@ impl CPU {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
-                        let pointer = self.register[register];
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
                                 let result =!self.bus.memory.read_8(pointer);
@@ -1532,28 +1540,28 @@ impl CPU {
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    let result = (self.register[register] as u8) << source_value;
-                                    self.register[register] = (self.register[register] & 0xFFFFFF00) | (result as u32);
+                                    let result = (self.read_register(register) as u8) << source_value;
+                                    self.write_register(register, (self.read_register(register) & 0xFFFFFF00) | (result as u32));
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 7) != 0;
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    let result = (self.register[register] as u16) << source_value;
-                                    self.register[register] = (self.register[register] & 0xFFFF0000) | (result as u32);
+                                    let result = (self.read_register(register) as u16) << source_value;
+                                    self.write_register(register, (self.read_register(register) & 0xFFFF0000) | (result as u32));
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 15) != 0;
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    let result = self.register[register] << source_value;
-                                    self.register[register] = result;
+                                    let result = self.read_register(register) << source_value;
+                                    self.write_register(register, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 31) != 0;
                                 }
@@ -1562,8 +1570,8 @@ impl CPU {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
-                        let pointer = self.register[register];
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(pointer) << source_value;
@@ -1631,28 +1639,28 @@ impl CPU {
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    let result = (self.register[register] as u8) >> source_value as i32;
-                                    self.register[register] = (self.register[register] & 0xFFFFFF00) | (result as u32);
+                                    let result = (self.read_register(register) as u8) >> source_value as i32;
+                                    self.write_register(register, (self.read_register(register) & 0xFFFFFF00) | (result as u32));
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    let result = (self.register[register] as u16) >> source_value as i32;
-                                    self.register[register] = (self.register[register] & 0xFFFF0000) | (result as u32);
+                                    let result = (self.read_register(register) as u16) >> source_value as i32;
+                                    self.write_register(register, (self.read_register(register) & 0xFFFF0000) | (result as u32));
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    let result = self.register[register] >> source_value as i32;
-                                    self.register[register] = result;
+                                    let result = self.read_register(register) >> source_value as i32;
+                                    self.write_register(register, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
@@ -1661,8 +1669,8 @@ impl CPU {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
-                        let pointer = self.register[register];
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(pointer) >> source_value as i32;
@@ -1730,28 +1738,28 @@ impl CPU {
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    let result = (self.register[register] as u8) >> source_value;
-                                    self.register[register] = (self.register[register] & 0xFFFFFF00) | (result as u32);
+                                    let result = (self.read_register(register) as u8) >> source_value;
+                                    self.write_register(register, (self.read_register(register) & 0xFFFFFF00) | (result as u32));
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    let result = (self.register[register] as u16) >> source_value;
-                                    self.register[register] = (self.register[register] & 0xFFFF0000) | (result as u32);
+                                    let result = (self.read_register(register) as u16) >> source_value;
+                                    self.write_register(register, (self.read_register(register) & 0xFFFF0000) | (result as u32));
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    let result = self.register[register] >> source_value;
-                                    self.register[register] = result;
+                                    let result = self.read_register(register) >> source_value;
+                                    self.write_register(register, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
@@ -1760,8 +1768,8 @@ impl CPU {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
-                        let pointer = self.register[register];
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(pointer) >> source_value;
@@ -1829,28 +1837,28 @@ impl CPU {
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    let result = (self.register[register] as u8).rotate_left(source_value);
-                                    self.register[register] = (self.register[register] & 0xFFFFFF00) | (result as u32);
+                                    let result = (self.read_register(register) as u8).rotate_left(source_value);
+                                    self.write_register(register, (self.read_register(register) & 0xFFFFFF00) | (result as u32));
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 7) != 0;
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    let result = (self.register[register] as u16).rotate_left(source_value);
-                                    self.register[register] = (self.register[register] & 0xFFFF0000) | (result as u32);
+                                    let result = (self.read_register(register) as u16).rotate_left(source_value);
+                                    self.write_register(register, (self.read_register(register) & 0xFFFF0000) | (result as u32));
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 15) != 0;
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    let result = self.register[register].rotate_left(source_value);
-                                    self.register[register] = result;
+                                    let result = self.read_register(register).rotate_left(source_value);
+                                    self.write_register(register, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 31) != 0;
                                 }
@@ -1859,8 +1867,8 @@ impl CPU {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
-                        let pointer = self.register[register];
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(pointer).rotate_left(source_value);
@@ -1928,28 +1936,28 @@ impl CPU {
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    let result = (self.register[register] as u8).rotate_right(source_value);
-                                    self.register[register] = (self.register[register] & 0xFFFFFF00) | (result as u32);
+                                    let result = (self.read_register(register) as u8).rotate_right(source_value);
+                                    self.write_register(register, (self.read_register(register) & 0xFFFFFF00) | (result as u32));
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    let result = (self.register[register] as u16).rotate_right(source_value);
-                                    self.register[register] = (self.register[register] & 0xFFFF0000) | (result as u32);
+                                    let result = (self.read_register(register) as u16).rotate_right(source_value);
+                                    self.write_register(register, (self.read_register(register) & 0xFFFF0000) | (result as u32));
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    let result = self.register[register].rotate_right(source_value);
-                                    self.register[register] = result;
+                                    let result = self.read_register(register).rotate_right(source_value);
+                                    self.write_register(register, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
@@ -1958,8 +1966,8 @@ impl CPU {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
-                        let pointer = self.register[register];
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(pointer).rotate_right(source_value);
@@ -2028,32 +2036,32 @@ impl CPU {
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
-                                let result = self.register[register] as u8 | (1 << source_value);
+                                let result = self.read_register(register) as u8 | (1 << source_value);
                                 if should_run {
-                                    self.register[register] = (self.register[register] & 0xFFFFFF00) | (result as u32);
+                                    self.write_register(register, (self.read_register(register) & 0xFFFFFF00) | (result as u32));
                                 }
                             }
                             Size::Half => {
-                                let result = self.register[register] as u16 | (1 << source_value);
+                                let result = self.read_register(register) as u16 | (1 << source_value);
                                 if should_run {
-                                    self.register[register] = (self.register[register] & 0xFFFF0000) | (result as u32);
+                                    self.write_register(register, (self.read_register(register) & 0xFFFF0000) | (result as u32));
                                 }
                             }
                             Size::Word => {
-                                let result = self.register[register] | (1 << source_value);
+                                let result = self.read_register(register) | (1 << source_value);
                                 if should_run {
-                                    self.register[register] = result;
+                                    self.write_register(register, result);
                                 }
                             }
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
-                        let pointer = self.register[register];
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(pointer) | (1 << source_value);
@@ -2109,32 +2117,32 @@ impl CPU {
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
-                                let result = self.register[register] as u8 & !(1 << source_value);
+                                let result = self.read_register(register) as u8 & !(1 << source_value);
                                 if should_run {
-                                    self.register[register] = (self.register[register] & 0xFFFFFF00) | (result as u32);
+                                    self.write_register(register, (self.read_register(register) & 0xFFFFFF00) | (result as u32));
                                 }
                             }
                             Size::Half => {
-                                let result = self.register[register] as u16 & !(1 << source_value);
+                                let result = self.read_register(register) as u16 & !(1 << source_value);
                                 if should_run {
-                                    self.register[register] = (self.register[register] & 0xFFFF0000) | (result as u32);
+                                    self.write_register(register, (self.read_register(register) & 0xFFFF0000) | (result as u32));
                                 }
                             }
                             Size::Word => {
-                                let result = self.register[register] & !(1 << source_value);
+                                let result = self.read_register(register) & !(1 << source_value);
                                 if should_run {
-                                    self.register[register] = result;
+                                    self.write_register(register, result);
                                 }
                             }
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
-                        let pointer = self.register[register];
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(pointer) & !(1 << source_value);
@@ -2190,22 +2198,22 @@ impl CPU {
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
-                                let result = self.register[register] as u8 & (1 << source_value) == 0;
+                                let result = self.read_register(register) as u8 & (1 << source_value) == 0;
                                 if should_run {
                                     self.flag.zero = result;
                                 }
                             }
                             Size::Half => {
-                                let result = self.register[register] as u16 & (1 << source_value) == 0;
+                                let result = self.read_register(register) as u16 & (1 << source_value) == 0;
                                 if should_run {
                                     self.flag.zero = result;
                                 }
                             }
                             Size::Word => {
-                                let result = self.register[register] & (1 << source_value) == 0;
+                                let result = self.read_register(register) & (1 << source_value) == 0;
                                 if should_run {
                                     self.flag.zero = result;
                                 }
@@ -2214,8 +2222,8 @@ impl CPU {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
-                        let pointer = self.register[register];
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(pointer) & (1 << source_value) == 0;
@@ -2272,25 +2280,25 @@ impl CPU {
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    let result = (self.register[register] as u8).overflowing_sub(source_value as u8);
+                                    let result = (self.read_register(register) as u8).overflowing_sub(source_value as u8);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    let result = (self.register[register] as u16).overflowing_sub(source_value as u16);
+                                    let result = (self.read_register(register) as u16).overflowing_sub(source_value as u16);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    let result = (self.register[register]).overflowing_sub(source_value);
+                                    let result = self.read_register(register).overflowing_sub(source_value);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -2299,8 +2307,8 @@ impl CPU {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
-                        let pointer = self.register[register];
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(pointer).overflowing_sub(source_value as u8);
@@ -2362,29 +2370,29 @@ impl CPU {
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    self.register[register] = (self.register[register] & 0xFFFFFF00) | (source_value & 0x000000FF);
+                                    self.write_register(register, (self.read_register(register) & 0xFFFFFF00) | (source_value & 0x000000FF));
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    self.register[register] = (self.register[register] & 0xFFFF0000) | (source_value & 0x0000FFFF);
+                                    self.write_register(register, (self.read_register(register) & 0xFFFF0000) | (source_value & 0x0000FFFF));
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    self.register[register] = source_value;
+                                    self.write_register(register, source_value);
                                 }
                             }
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
-                        let pointer = self.register[register];
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
                                 if should_run {
@@ -2434,21 +2442,21 @@ impl CPU {
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    self.register[register] = source_value & 0x000000FF;
+                                    self.write_register(register, source_value & 0x000000FF);
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    self.register[register] = source_value & 0x0000FFFF;
+                                    self.write_register(register, source_value & 0x0000FFFF);
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    self.register[register] = source_value;
+                                    self.write_register(register, source_value);
                                 }
                             }
                         }
@@ -2481,8 +2489,8 @@ impl CPU {
             Instruction::Loop(condition, source) => {
                 let (source_value, instruction_pointer_offset) = self.read_source(source);
                 let should_run = self.check_condition(condition);
-                let result = self.register[31].overflowing_sub(1);
-                self.register[31] = result.0;
+                let result = self.read_register(31).overflowing_sub(1);
+                self.write_register(31, result.0);
                 if should_run {
                     if result.0 != 0 {
                         source_value
@@ -2515,8 +2523,8 @@ impl CPU {
             Instruction::Rloop(condition, source) => {
                 let (source_value, instruction_pointer_offset) = self.read_source(source);
                 let should_run = self.check_condition(condition);
-                let result = self.register[31].overflowing_sub(1);
-                self.register[31] = result.0;
+                let result = self.read_register(31).overflowing_sub(1);
+                self.write_register(31, result.0);
                 if should_run {
                     if result.0 != 0 {
                         self.relative_to_absolute(source_value)
@@ -2533,15 +2541,15 @@ impl CPU {
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
                         if should_run {
-                            self.register[register] = self.relative_to_absolute(source_value);
+                            self.write_register(register, self.relative_to_absolute(source_value));
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
-                        let pointer = self.relative_to_absolute(self.register[register]);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.relative_to_absolute(self.read_register(register));
                         if should_run {
                             // INFO: register contains a relative address instead of an absolute address
                             self.bus.memory.write_32(pointer, self.relative_to_absolute(source_value));
@@ -2587,32 +2595,32 @@ impl CPU {
                 let should_run = self.check_condition(condition);
                 match source {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
                                 if should_run {
                                     let value = self.pop_stack_8() as u32;
-                                    self.register[register] = (self.register[register] & 0xFFFFFF00) | value;
+                                    self.write_register(register, (self.read_register(register) & 0xFFFFFF00) | value);
                                 }
                             }
                             Size::Half => {
                                 if should_run {
                                     let value = self.pop_stack_16() as u32;
-                                    self.register[register] = (self.register[register] & 0xFFFF0000) | value;
+                                    self.write_register(register, (self.read_register(register) & 0xFFFF0000) | value);
                                 }
                             }
                             Size::Word => {
                                 if should_run {
                                     let value = self.pop_stack_32();
-                                    self.register[register] = value;
+                                    self.write_register(register, value);
                                 }
                             }
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
-                        let pointer = self.register[register];
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
                                 if should_run {
@@ -2690,16 +2698,16 @@ impl CPU {
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
                         let value = self.bus.read_io(source_value);
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                         if should_run {
-                            self.register[register] = value;
+                            self.write_register(register, value);
                         }
                     }
                     Operand::RegisterPtr => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
-                        let pointer = self.register[register];
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.read_register(register);
                         let value = self.bus.read_io(source_value);
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                         if should_run {
@@ -2723,15 +2731,15 @@ impl CPU {
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                         if should_run {
-                            self.bus.write_io(self.register[register], source_value);
+                            self.bus.write_io(self.read_register(register), source_value);
                         }
                     }
                     Operand::RegisterPtr => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset) as usize;
-                        let pointer = self.register[register];
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.read_register(register);
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                         if should_run {
                             self.bus.write_io(self.bus.memory.read_32(pointer), source_value);
