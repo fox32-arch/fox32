@@ -212,7 +212,7 @@ fn main() {
     let mut cpu = {
         let cpu_shared_memory = Arc::clone(&shared_memory);
         let cpu_overlays = Arc::clone(&display.overlays);
-        let cpu_read_only_memory = read("fox32.rom").unwrap();
+        let cpu_read_only_memory = read("fox32.rom").expect("fox32.rom not found!");
         // 32 MiB of CPU-only memory
         let memory = Memory::new(0x02000000, cpu_shared_memory, cpu_overlays, cpu_read_only_memory);
 
