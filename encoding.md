@@ -6,7 +6,7 @@ xx   xxxxxx 0 xxx  xx   xx  <8,16,32 bits> <8,16,32 bits>
 
 
 # Size table
-If instruction doesn't allow variable sizes or size was not specified, set size bits to 0b11
+If the instruction doesn't allow variable sizes or a size was not specified, set the size bits to Word (0b10)
 |      |                |
 | :--: | -------------- |
 | 0b00 | byte (8 bits)  |
