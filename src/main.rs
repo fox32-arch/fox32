@@ -2,7 +2,7 @@
 
 pub mod cpu;
 pub mod mouse;
-use cpu::{Bus, CPU, Memory, Interrupt, IO};
+use cpu::{Bus, Cpu, Memory, Interrupt, IO};
 use mouse::Mouse;
 
 use std::convert::TryInto;
@@ -219,7 +219,7 @@ fn main() {
         let cpu_mouse = Arc::clone(&mouse);
 
         let bus = Bus { memory, mouse: cpu_mouse };
-        CPU::new(bus)
+        Cpu::new(bus)
     };
 
     if args.len() >= 2 {

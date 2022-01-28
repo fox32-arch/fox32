@@ -149,7 +149,7 @@ pub enum Interrupt {
     Request(u8), // u8 contains the interrupt vector value
 }
 
-pub struct CPU {
+pub struct Cpu {
     pub instruction_pointer: u32,
     pub stack_pointer: u32,
 
@@ -162,9 +162,9 @@ pub struct CPU {
     pub bus: Bus,
 }
 
-impl CPU {
+impl Cpu {
     pub fn new(bus: Bus) -> Self {
-        CPU {
+        Cpu {
             instruction_pointer: 0xF0000000,
             stack_pointer: 0x02000000,
             register: [0; 32],
