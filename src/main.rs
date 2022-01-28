@@ -68,11 +68,23 @@ fn main() {
     let shared_memory = Arc::new(Mutex::new(vec![0u8; 0x0200000F]));
 
     let mut cpu = {
+        // 32 MiB of fast memory
+        let cpu_fast_memory = vec![0; 0x02000000];
         let cpu_shared_memory = Arc::clone(&shared_memory);
         let cpu_overlays = Arc::clone(&display.overlays);
         let cpu_read_only_memory = read_rom();
-        // 32 MiB of CPU-only memory
-        let memory = Memory::new(0x02000000, cpu_shared_memory, cpu_overlays, cpu_read_only_memory);
+
+        let fast_size = cpu_fast_memory.len();
+        let fast_bottom_address = 0x00000000;
+        let fast_top_address = fast_bottom_address + fast_size - 1;
+        println!("Fast memory: {:.2}MB mapped at {:#010X}-{:#010X}", fast_size / 1048576, fast_bottom_address, fast_top_address);
+
+        let shared_size = { cpu_shared_memory.lock().unwrap().len() };
+        let shared_bottom_address = 0x02000000;
+        let shared_top_address = shared_bottom_address + shared_size - 1;
+        println!("Shared memory: {:.2}MB mapped at {:#010X}-{:#010X}", shared_size / 1048576, shared_bottom_address, shared_top_address);
+
+        let memory = Memory::new(cpu_fast_memory, cpu_shared_memory, cpu_overlays, cpu_read_only_memory);
 
         let cpu_mouse = Arc::clone(&mouse);
 
