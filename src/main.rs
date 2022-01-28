@@ -73,12 +73,17 @@ fn main() {
         let fast_size = cpu_fast_memory.len();
         let fast_bottom_address = 0x00000000;
         let fast_top_address = fast_bottom_address + fast_size - 1;
-        println!("Fast memory: {:.2}MB mapped at {:#010X}-{:#010X}", fast_size / 1048576, fast_bottom_address, fast_top_address);
+        println!("Fast:   {:.2}MB mapped at {:#010X}-{:#010X}", fast_size / 1048576, fast_bottom_address, fast_top_address);
 
         let shared_size = { cpu_shared_memory.lock().unwrap().len() };
         let shared_bottom_address = 0x80000000;
         let shared_top_address = shared_bottom_address + shared_size - 1;
-        println!("Shared memory: {:.2}MB mapped at {:#010X}-{:#010X}", shared_size / 1048576, shared_bottom_address, shared_top_address);
+        println!("Shared: {:.2}MB mapped at {:#010X}-{:#010X}", shared_size / 1048576, shared_bottom_address, shared_top_address);
+
+        let rom_size = cpu_read_only_memory.len();
+        let rom_bottom_address = 0xF0000000;
+        let rom_top_address = rom_bottom_address + rom_size - 1;
+        println!("ROM:    {:.2}MB mapped at {:#010X}-{:#010X}", rom_size / 1048576, rom_bottom_address, rom_top_address);
 
         let memory = Memory::new(cpu_fast_memory, cpu_shared_memory, cpu_overlays, cpu_read_only_memory);
 
