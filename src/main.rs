@@ -41,6 +41,15 @@ pub struct Overlay {
     framebuffer_pointer: u32,
 }
 
+fn read_rom() -> Vec<u8> {
+    read("fox32.rom").unwrap_or_else(|_| {
+        println!("fox32.rom not found, attempting to open ../fox32rom/fox32.rom instead");
+        read("../fox32rom/fox32.rom").unwrap_or_else(|_| {
+            panic!("oh fuck");
+        })
+    })
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     /*if args.len() != 2 {
@@ -61,7 +70,7 @@ fn main() {
     let mut cpu = {
         let cpu_shared_memory = Arc::clone(&shared_memory);
         let cpu_overlays = Arc::clone(&display.overlays);
-        let cpu_read_only_memory = read("fox32.rom").expect("fox32.rom not found!");
+        let cpu_read_only_memory = read_rom();
         // 32 MiB of CPU-only memory
         let memory = Memory::new(0x02000000, cpu_shared_memory, cpu_overlays, cpu_read_only_memory);
 
