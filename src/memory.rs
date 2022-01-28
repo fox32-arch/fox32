@@ -5,12 +5,12 @@ use crate::{Overlay};
 use std::sync::{Arc, Mutex};
 
 pub struct Memory {
-    fast_memory: Vec<u8>,
+    pub fast_memory: Vec<u8>,
     pub shared_memory: Arc<Mutex<Vec<u8>>>,
 
     pub overlays: Arc<Mutex<Vec<Overlay>>>,
 
-    rom: Vec<u8>,
+    pub rom: Vec<u8>,
 }
 
 impl Memory {
