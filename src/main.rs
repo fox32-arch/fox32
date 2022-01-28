@@ -51,6 +51,9 @@ fn read_rom() -> Vec<u8> {
 }
 
 fn main() {
+    let version_string = format!("fox32 {} ({})", env!("VERGEN_BUILD_SEMVER"), env!("VERGEN_GIT_SHA_SHORT"));
+    println!("{}", version_string);
+
     let args: Vec<String> = env::args().collect();
     /*if args.len() != 2 {
         println!("fox32\nUsage: {} <binary>", &args[0]);
@@ -109,7 +112,7 @@ fn main() {
     let window = {
         let size = LogicalSize::new(WIDTH as f64, HEIGHT as f64);
         WindowBuilder::new()
-            .with_title("fox32")
+            .with_title(version_string)
             .with_inner_size(size)
             .with_min_inner_size(size)
             .build(&event_loop)
