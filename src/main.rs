@@ -61,11 +61,7 @@ fn main() {
     let mouse = Arc::new(Mutex::new(Mouse::new()));
 
     // 32 MiB of shared memory
-    // add some "bonus bytes" at the end of memory to prevent dumb errors - (lua was here)
-    // see the ImmediatePtr match arm in read_source() in cpu.rs for more info
-    // basically all immediate pointers read 32 bits, even if the opcode size is smaller
-    // so attempting to read something like the last byte of shared memory (0x03FFFFFF) would previously panic
-    let shared_memory = Arc::new(Mutex::new(vec![0u8; 0x0200000F]));
+    let shared_memory = Arc::new(Mutex::new(vec![0u8; 0x02000000]));
 
     let mut cpu = {
         // 32 MiB of fast memory
@@ -80,7 +76,7 @@ fn main() {
         println!("Fast memory: {:.2}MB mapped at {:#010X}-{:#010X}", fast_size / 1048576, fast_bottom_address, fast_top_address);
 
         let shared_size = { cpu_shared_memory.lock().unwrap().len() };
-        let shared_bottom_address = 0x02000000;
+        let shared_bottom_address = 0x80000000;
         let shared_top_address = shared_bottom_address + shared_size - 1;
         println!("Shared memory: {:.2}MB mapped at {:#010X}-{:#010X}", shared_size / 1048576, shared_bottom_address, shared_top_address);
 

@@ -37,7 +37,7 @@ impl Bus {
                     }
                     0x02 => {
                         // we're reading the framebuffer pointer of this overlay
-                        overlay_lock[overlay_number].framebuffer_pointer + 0x02000000
+                        overlay_lock[overlay_number].framebuffer_pointer + 0x80000000
                     }
                     0x03 => {
                         // we're reading the enable status of this overlay
@@ -108,7 +108,7 @@ impl Bus {
                         if word < 0x02000000 {
                             panic!("overlay framebuffer must be within shared memory");
                         }
-                        overlay_lock[overlay_number].framebuffer_pointer = word - 0x02000000;
+                        overlay_lock[overlay_number].framebuffer_pointer = word - 0x80000000;
                     }
                     0x03 => {
                         // we're setting the enable status of this overlay
@@ -121,7 +121,7 @@ impl Bus {
                 if word < 0x02000000 {
                     panic!("audio buffer must be within shared memory");
                 }
-                let address = word as usize - 0x02000000;
+                let address = word as usize - 0x80000000;
                 let shared_memory_lock = self.memory.shared_memory.lock().unwrap();
 
                 let length = u32::from_le_bytes(shared_memory_lock[address..address+4].try_into().unwrap()) as usize;
