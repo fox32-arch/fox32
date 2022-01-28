@@ -3,7 +3,7 @@
 // TODO: in the instruction match statement, all of the register ones have `let result` inside the if statement
 //       move this up to match all of the other ones (or move all of the other ones down, which would probably be better anyways)
 
-use crate::{Mouse, Overlay};
+use crate::{Bus, Overlay};
 use std::sync::{Arc, Mutex};
 
 const DEBUG: bool = false;
@@ -93,24 +93,6 @@ impl Memory {
             shared_memory_lock[address + 3] = ((word & 0xFF000000) >> 24) as u8;
         }
     }
-}
-
-pub trait IO {
-    // called during the `in` instruction
-    // default implementation returns 0
-    fn read_io(&mut self, port: u32) -> u32 {
-        if DEBUG { println!("read_io(): port: {:#010X}", port); }
-        0
-    }
-    // called during the `out` instruction
-    fn write_io(&mut self, port: u32, word: u32) {
-        if DEBUG { println!("write_io(): port: {:#010X}, word: {:#010X}", port, word); }
-    }
-}
-
-pub struct Bus {
-    pub memory: Memory,
-    pub mouse: Arc<Mutex<Mouse>>,
 }
 
 #[derive(Copy, Clone)]
