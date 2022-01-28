@@ -2,9 +2,11 @@
 
 pub mod bus;
 pub mod cpu;
+pub mod memory;
 pub mod mouse;
 use bus::Bus;
-use cpu::{Cpu, Memory, Interrupt};
+use cpu::{Cpu, Interrupt};
+use memory::Memory;
 use mouse::Mouse;
 
 use std::env;
