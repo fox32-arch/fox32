@@ -17,7 +17,7 @@ pub struct Bus {
 impl Bus {
     pub fn read_io(&mut self, port: u32) -> u32 {
         match port {
-            0x02000000..=0x0200031F => { // overlay port
+            0x80000000..=0x8000031F => { // overlay port
                 let overlay_lock = self.memory.overlays.lock().unwrap();
                 let overlay_number = (port & 0x000000FF) as usize;
                 let setting = (port & 0x0000FF00) >> 8;
@@ -46,7 +46,7 @@ impl Bus {
                     _ => panic!("invalid overlay control port"),
                 }
             }
-            0x02000400..=0x02000401 => { // mouse port
+            0x80000400..=0x80000401 => { // mouse port
                 let setting = (port & 0x000000FF) as u8;
                 match setting {
                     0x00 => {
@@ -83,7 +83,7 @@ impl Bus {
                 print!("{}", word as u8 as char);
                 stdout().flush().expect("could not flush stdout");
             }
-            0x02000000..=0x0200031F => { // overlay port
+            0x80000000..=0x8000031F => { // overlay port
                 let mut overlay_lock = self.memory.overlays.lock().unwrap();
                 let overlay_number = (port & 0x000000FF) as usize;
                 let setting = (port & 0x0000FF00) >> 8;
@@ -105,7 +105,7 @@ impl Bus {
                     }
                     0x02 => {
                         // we're setting the framebuffer pointer of this overlay
-                        if word < 0x02000000 {
+                        if word < 0x80000000 {
                             panic!("overlay framebuffer must be within shared memory");
                         }
                         overlay_lock[overlay_number].framebuffer_pointer = word - 0x80000000;
@@ -117,8 +117,8 @@ impl Bus {
                     _ => panic!("invalid overlay control port"),
                 }
             }
-            0x02000320 => { // audio port
-                if word < 0x02000000 {
+            0x80000320 => { // audio port
+                if word < 0x80000000 {
                     panic!("audio buffer must be within shared memory");
                 }
                 let address = word as usize - 0x80000000;
@@ -140,7 +140,7 @@ impl Bus {
                     }
                 }).unwrap();
             }
-            0x02000400..=0x02000401 => { // mouse port
+            0x80000400..=0x80000401 => { // mouse port
                 let setting = (port & 0x000000FF) as u8;
                 match setting {
                     0x00 => {
