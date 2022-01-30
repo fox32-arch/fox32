@@ -38,6 +38,7 @@ impl DiskController {
             .add_filter("f32 Binary", &["f32"])
             .add_filter("Raw Binary", &["bin"])
             .add_filter("All Files", &["*"])
+            .set_title(&format!("Select a file to mount"))
             .pick_file();
         match path {
             Some(path) => Some(File::open(path).unwrap()),
