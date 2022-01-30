@@ -208,7 +208,6 @@ fn main() {
             mouse_lock.y = mouse_pixel.1;
             mouse_lock.held = input.mouse_held(0);
             if input.mouse_pressed(0) {
-                println!("Mouse click at {:?}", mouse_pixel);
                 mouse_lock.click = true;
             }
         }
