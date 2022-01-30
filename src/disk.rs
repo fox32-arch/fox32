@@ -34,9 +34,10 @@ impl DiskController {
     }
     pub fn select_file(&self) -> Option<File> {
         let path = FileDialog::new()
-            .add_filter("disk image", &["img", "dsk"])
-            .add_filter("f32 binary", &["f32"])
-            .add_filter("raw binary", &["bin"])
+            .add_filter("Disk Image", &["img", "dsk"])
+            .add_filter("f32 Binary", &["f32"])
+            .add_filter("Raw Binary", &["bin"])
+            .add_filter("All Files", &["*"])
             .pick_file();
         match path {
             Some(path) => Some(File::open(path).unwrap()),
