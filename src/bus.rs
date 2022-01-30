@@ -1,6 +1,6 @@
 // bus.rs
 
-use crate::{Memory, Mouse};
+use crate::{DiskController, Memory, Mouse};
 
 use std::convert::TryInto;
 use std::io::{stdout, Write};
@@ -10,6 +10,7 @@ use std::thread;
 use rodio::{OutputStream, buffer::SamplesBuffer, Sink};
 
 pub struct Bus {
+    pub disk_controller: DiskController,
     pub memory: Memory,
     pub mouse: Arc<Mutex<Mouse>>,
 }
@@ -72,6 +73,31 @@ impl Bus {
                         (y << 16) | x
                     }
                     _ => panic!("invalid mouse control port"),
+                }
+            }
+            0x80001000..=0x80002200 => { // disk controller port
+                let address_or_id = (port & 0x00000FFF) as usize;
+                let operation = (port & 0x0000F000) >> 8;
+
+                match operation {
+                    0x10 => {
+                        // we're reading the current mount state of the specified disk id
+                        if address_or_id > 3 {
+                            panic!("invalid disk ID");
+                        }
+                        match &self.disk_controller.disk[address_or_id] {
+                            Some(disk) => disk.size as u32, // return size if this disk is mounted
+                            None => 0, // return 0 if this disk is not mounted
+                        }
+                    }
+                    0x20 => {
+                        // we're reading from the sector buffer
+                        if address_or_id > 512 {
+                            panic!("attempted to read past the end of the disk controller sector buffer");
+                        }
+                        self.disk_controller.sector_buffer[address_or_id] as u32
+                    }
+                    _ => panic!("invalid disk controller port"),
                 }
             }
             _ => 0,
@@ -158,6 +184,48 @@ impl Bus {
                         mouse_lock.y = y;
                     }
                     _ => panic!("invalid mouse control port"),
+                }
+            }
+            0x80001000..=0x80004200 => { // disk controller port
+                let address_or_id = (port & 0x00000FFF) as usize;
+                let operation = (port & 0x0000F000) >> 8;
+
+                match operation {
+                    0x10 => {
+                        // we're requesting a disk to be mounted to the specified disk id
+                        if address_or_id > 3 {
+                            panic!("invalid disk ID");
+                        }
+                        let file = self.disk_controller.select_file();
+                        match file {
+                            Some(file) => self.disk_controller.mount(file, address_or_id as u8),
+                            None => {},
+                        };
+                    }
+                    0x20 => {
+                        // we're writing to the sector buffer
+                        if address_or_id > 512 {
+                            panic!("attempted to read past the end of the disk controller sector buffer");
+                        }
+                        self.disk_controller.sector_buffer[address_or_id] = word as u8;
+                    }
+                    0x30 => {
+                        // we're reading the specified sector of the specified disk id into the sector buffer
+                        if address_or_id > 3 {
+                            panic!("invalid disk ID");
+                        }
+                        self.disk_controller.set_current_sector(address_or_id as u8, word);
+                        self.disk_controller.read_into_buffer(address_or_id as u8);
+                    }
+                    0x40 => {
+                        // we're writing the specified sector to the specified disk id from the sector buffer
+                        if address_or_id > 3 {
+                            panic!("invalid disk ID");
+                        }
+                        self.disk_controller.set_current_sector(address_or_id as u8, word);
+                        self.disk_controller.write_from_buffer(address_or_id as u8);
+                    }
+                    _ => panic!("invalid disk controller port"),
                 }
             }
             _ => return,

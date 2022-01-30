@@ -2,10 +2,12 @@
 
 pub mod bus;
 pub mod cpu;
+pub mod disk;
 pub mod memory;
 pub mod mouse;
 use bus::Bus;
 use cpu::{Cpu, Interrupt};
+use disk::DiskController;
 use memory::Memory;
 use mouse::Mouse;
 
@@ -92,7 +94,8 @@ fn main() {
 
         let cpu_mouse = Arc::clone(&mouse);
 
-        let bus = Bus { memory, mouse: cpu_mouse };
+        let disk_controller = DiskController::new();
+        let bus = Bus { disk_controller, memory, mouse: cpu_mouse };
         Cpu::new(bus)
     };
 
