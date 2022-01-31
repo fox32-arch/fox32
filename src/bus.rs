@@ -2,12 +2,8 @@
 
 use crate::{DiskController, Memory, Mouse};
 
-use std::convert::TryInto;
 use std::io::{stdout, Write};
 use std::sync::{Arc, Mutex};
-use std::thread;
-
-use rodio::{OutputStream, buffer::SamplesBuffer, Sink};
 
 pub struct Bus {
     pub disk_controller: DiskController,
@@ -142,29 +138,6 @@ impl Bus {
                     }
                     _ => panic!("invalid overlay control port"),
                 }
-            }
-            0x80000320 => { // audio port
-                if word < 0x80000000 {
-                    panic!("audio buffer must be within shared memory");
-                }
-                let address = word as usize - 0x80000000;
-                let shared_memory_lock = self.memory.shared_memory.lock().unwrap();
-
-                let length = u32::from_le_bytes(shared_memory_lock[address..address+4].try_into().unwrap()) as usize;
-                let start_address = address + 4;
-                let end_address = start_address + length;
-
-                let audio_data: Vec<i16> = shared_memory_lock[start_address..end_address].to_vec().chunks_exact(2).map(|x| ((x[1] as i16) << 8) | x[0] as i16).collect();
-                let builder = thread::Builder::new().name("audio".to_string());
-                builder.spawn({
-                    move || {
-                        let buffer = SamplesBuffer::new(1, 44100, audio_data);
-                        let (_stream, stream_handle) = OutputStream::try_default().unwrap();
-                        let sink = Sink::try_new(&stream_handle).unwrap();
-                        sink.append(buffer);
-                        sink.sleep_until_end();
-                    }
-                }).unwrap();
             }
             0x80000400..=0x80000401 => { // mouse port
                 let setting = (port & 0x000000FF) as u8;

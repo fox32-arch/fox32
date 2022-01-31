@@ -11,7 +11,6 @@ build = "build.rs"
 log = "0.4"
 pixels = "0.9.0"
 rfd = "0.7.0"
-rodio = "0.14.0"
 winit = "0.26"
 winit_input_helper = "0.11"
 
