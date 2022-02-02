@@ -2785,7 +2785,8 @@ impl Instruction {
         let destination = match (((half & 0x000F) >> 2) as u8) & 0b00000011 {
             0x00 => Operand::Register,
             0x01 => Operand::RegisterPtr,
-            0x02 => Operand::ImmediatePtr(size),
+            // 0x02 is invalid, can't use an immediate value as a destination
+            0x03 => Operand::ImmediatePtr(size),
             _ => return None,
         };
         let condition = match (half & 0x00F0) as u8 {
