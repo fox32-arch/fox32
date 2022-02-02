@@ -66,25 +66,21 @@ fn main() {
     let mouse = Arc::new(Mutex::new(Mouse::new()));
 
     // 32 MiB of shared memory
-    // plus 3 bytes at the end to allow for reading the last byte of memory as an immediate pointer
-    // Operand::ImmediatePtr always reads 4 bytes
-    let shared_memory = Arc::new(Mutex::new(vec![0u8; 0x02000003]));
+    let shared_memory = Arc::new(Mutex::new(vec![0u8; 0x02000000]));
 
     let mut cpu = {
         // 32 MiB of fast memory
-        // plus 3 extra bytes at the end to allow for reading the last byte of memory as an immediate pointer
-        // Operand::ImmediatePtr always reads 4 bytes
-        let cpu_fast_memory = vec![0; 0x02000003];
+        let cpu_fast_memory = vec![0; 0x02000000];
         let cpu_shared_memory = Arc::clone(&shared_memory);
         let cpu_overlays = Arc::clone(&display.overlays);
         let cpu_read_only_memory = read_rom();
 
-        let fast_size = cpu_fast_memory.len() - 3;
+        let fast_size = cpu_fast_memory.len();
         let fast_bottom_address = 0x00000000;
         let fast_top_address = fast_bottom_address + fast_size - 1;
         println!("Fast:   {:.2}MB mapped at {:#010X}-{:#010X}", fast_size / 1048576, fast_bottom_address, fast_top_address);
 
-        let shared_size = { cpu_shared_memory.lock().unwrap().len() - 3 };
+        let shared_size = { cpu_shared_memory.lock().unwrap().len() };
         let shared_bottom_address = 0x80000000;
         let shared_top_address = shared_bottom_address + shared_size - 1;
         println!("Shared: {:.2}MB mapped at {:#010X}-{:#010X}", shared_size / 1048576, shared_bottom_address, shared_top_address);

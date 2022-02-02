@@ -112,9 +112,13 @@ impl Cpu {
                 instruction_pointer_offset += 4; // increment past 32 bit immediate
                 value
             }
-            Operand::ImmediatePtr => {
+            Operand::ImmediatePtr(size) => {
                 let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
-                let value = self.bus.memory.read_32(pointer);
+                let value = match size {
+                    Size::Byte => self.bus.memory.read_8(pointer) as u32,
+                    Size::Half => self.bus.memory.read_16(pointer) as u32,
+                    Size::Word => self.bus.memory.read_32(pointer),
+                };
                 instruction_pointer_offset += 4; // increment past 32 bit pointer
                 value
             }
@@ -359,7 +363,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::ImmediatePtr => {
+                    Operand::ImmediatePtr(_) => {
                         let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
@@ -458,7 +462,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::ImmediatePtr => {
+                    Operand::ImmediatePtr(_) => {
                         let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
@@ -557,7 +561,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::ImmediatePtr => {
+                    Operand::ImmediatePtr(_) => {
                         let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
@@ -656,7 +660,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::ImmediatePtr => {
+                    Operand::ImmediatePtr(_) => {
                         let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
@@ -755,7 +759,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::ImmediatePtr => {
+                    Operand::ImmediatePtr(_) => {
                         let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
@@ -848,7 +852,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::ImmediatePtr => {
+                    Operand::ImmediatePtr(_) => {
                         let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
@@ -944,7 +948,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::ImmediatePtr => {
+                    Operand::ImmediatePtr(_) => {
                         let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
@@ -1037,7 +1041,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::ImmediatePtr => {
+                    Operand::ImmediatePtr(_) => {
                         let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
@@ -1128,7 +1132,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::ImmediatePtr => {
+                    Operand::ImmediatePtr(_) => {
                         let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
@@ -1218,7 +1222,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::ImmediatePtr => {
+                    Operand::ImmediatePtr(_) => {
                         let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
@@ -1308,7 +1312,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::ImmediatePtr => {
+                    Operand::ImmediatePtr(_) => {
                         let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
@@ -1398,7 +1402,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::ImmediatePtr => {
+                    Operand::ImmediatePtr(_) => {
                         let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
@@ -1494,7 +1498,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::ImmediatePtr => {
+                    Operand::ImmediatePtr(_) => {
                         let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
@@ -1593,7 +1597,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::ImmediatePtr => {
+                    Operand::ImmediatePtr(_) => {
                         let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
@@ -1692,7 +1696,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::ImmediatePtr => {
+                    Operand::ImmediatePtr(_) => {
                         let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
@@ -1791,7 +1795,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::ImmediatePtr => {
+                    Operand::ImmediatePtr(_) => {
                         let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
@@ -1890,7 +1894,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::ImmediatePtr => {
+                    Operand::ImmediatePtr(_) => {
                         let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
@@ -1978,7 +1982,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::ImmediatePtr => {
+                    Operand::ImmediatePtr(_) => {
                         let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
@@ -2059,7 +2063,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::ImmediatePtr => {
+                    Operand::ImmediatePtr(_) => {
                         let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
@@ -2140,7 +2144,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::ImmediatePtr => {
+                    Operand::ImmediatePtr(_) => {
                         let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
@@ -2228,7 +2232,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::ImmediatePtr => {
+                    Operand::ImmediatePtr(_) => {
                         let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
@@ -2306,7 +2310,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::ImmediatePtr => {
+                    Operand::ImmediatePtr(_) => {
                         let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
@@ -2450,7 +2454,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::ImmediatePtr => {
+                    Operand::ImmediatePtr(_) => {
                         let pointer = self.relative_to_absolute(self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset));
                         if should_run {
                             self.bus.memory.write_32(pointer, self.relative_to_absolute(source_value));
@@ -2537,7 +2541,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::ImmediatePtr => {
+                    Operand::ImmediatePtr(_) => {
                         let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
                         match size {
                             Size::Byte => {
@@ -2608,7 +2612,7 @@ impl Cpu {
                             self.bus.memory.write_32(pointer, value);
                         }
                     }
-                    Operand::ImmediatePtr => {
+                    Operand::ImmediatePtr(_) => {
                         let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
                         let value = self.bus.read_io(source_value);
                         instruction_pointer_offset += 4; // increment past 32 bit pointer
@@ -2639,7 +2643,7 @@ impl Cpu {
                             self.bus.write_io(self.bus.memory.read_32(pointer), source_value);
                         }
                     }
-                    Operand::ImmediatePtr => {
+                    Operand::ImmediatePtr(_) => {
                         let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
                         instruction_pointer_offset += 4; // increment past 32 bit pointer
                         if should_run {
@@ -2680,10 +2684,10 @@ enum Operand {
     Immediate8,
     Immediate16,
     Immediate32,
-    ImmediatePtr,
+    ImmediatePtr(Size),
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 enum Size {
     Byte,
     Half,
@@ -2775,13 +2779,13 @@ impl Instruction {
                 Size::Half => Operand::Immediate16,
                 Size::Word => Operand::Immediate32,
             },
-            0x03 => Operand::ImmediatePtr,
+            0x03 => Operand::ImmediatePtr(size),
             _ => return None,
         };
         let destination = match (((half & 0x000F) >> 2) as u8) & 0b00000011 {
             0x00 => Operand::Register,
             0x01 => Operand::RegisterPtr,
-            0x02 => Operand::ImmediatePtr,
+            0x02 => Operand::ImmediatePtr(size),
             _ => return None,
         };
         let condition = match (half & 0x00F0) as u8 {

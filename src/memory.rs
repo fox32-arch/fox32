@@ -19,9 +19,9 @@ pub struct Memory {
 impl Memory {
     pub fn new(fast_memory: Vec<u8>, shared_memory: Arc<Mutex<Vec<u8>>>, overlays: Arc<Mutex<Vec<Overlay>>>, rom: Vec<u8>) -> Self {
         // 3 extra bytes at the end to allow for reading the last byte of memory as an immediate pointer
-        let shared_memory_size = { shared_memory.lock().unwrap().len() - 3 };
+        let shared_memory_size = { shared_memory.lock().unwrap().len() };
         Memory {
-            fast_memory_size: fast_memory.len() - 3,
+            fast_memory_size: fast_memory.len(),
             fast_memory,
             shared_memory_size,
             shared_memory,
