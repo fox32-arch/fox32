@@ -2673,7 +2673,6 @@ impl Cpu {
     }
 }
 
-// TODO: separate Immediate into Immediate8, Immediate16, and Immediate32
 #[derive(Debug)]
 enum Operand {
     Register,
