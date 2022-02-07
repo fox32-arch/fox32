@@ -35,7 +35,8 @@ If the instruction doesn't allow variable sizes or a size was not specified, set
 | :--: | ------------------- |
 | 0b00 | register            |
 | 0b01 | register (pointer)  |
-| 0b10 | immediate (pointer) |
+| 0b10 | (invalid)           |
+| 0b11 | immediate (pointer) |
 
 # Source table
 |      |                     |
