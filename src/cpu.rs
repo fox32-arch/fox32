@@ -60,7 +60,7 @@ impl Cpu {
     pub fn new(bus: Bus) -> Self {
         Cpu {
             instruction_pointer: 0xF0000000,
-            stack_pointer: bus.memory.fast_memory.len() as u32,
+            stack_pointer: 0x00000000,
             register: [0; 32],
             flag: Flag { zero: false, carry: false },
             halted: false,
