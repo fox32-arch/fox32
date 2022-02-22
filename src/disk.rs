@@ -38,17 +38,17 @@ impl DiskController {
             .add_filter("f32 Binary", &["f32"])
             .add_filter("Raw Binary", &["bin"])
             .add_filter("All Files", &["*"])
-            .set_title(&format!("Select a file to mount"))
+            .set_title(&format!("Select a file to insert"))
             .pick_file();
         match path {
             Some(path) => Some(File::open(path).unwrap()),
             None => None,
         }
     }
-    pub fn mount(&mut self, file: File, disk_id: u8) {
+    pub fn insert(&mut self, file: File, disk_id: u8) {
         self.disk[disk_id as usize] = Some(Disk::new(file));
     }
-    pub fn unmount(&mut self, disk_id: u8) {
+    pub fn remove(&mut self, disk_id: u8) {
         self.disk[disk_id as usize] = None;
     }
     pub fn get_size(&mut self, disk_id: u8) -> u64 {

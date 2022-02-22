@@ -77,13 +77,13 @@ impl Bus {
 
                 match operation {
                     0x10 => {
-                        // we're reading the current mount state of the specified disk id
+                        // we're reading the current insert state of the specified disk id
                         if address_or_id > 3 {
                             panic!("invalid disk ID");
                         }
                         match &self.disk_controller.disk[address_or_id] {
-                            Some(disk) => disk.size as u32, // return size if this disk is mounted
-                            None => 0, // return 0 if this disk is not mounted
+                            Some(disk) => disk.size as u32, // return size if this disk is inserted
+                            None => 0, // return 0 if this disk is not inserted
                         }
                     }
                     0x20 => {
@@ -165,13 +165,13 @@ impl Bus {
 
                 match operation {
                     0x10 => {
-                        // we're requesting a disk to be mounted to the specified disk id
+                        // we're requesting a disk to be inserted to the specified disk id
                         if address_or_id > 3 {
                             panic!("invalid disk ID");
                         }
                         let file = self.disk_controller.select_file();
                         match file {
-                            Some(file) => self.disk_controller.mount(file, address_or_id as u8),
+                            Some(file) => self.disk_controller.insert(file, address_or_id as u8),
                             None => {},
                         };
                     }
