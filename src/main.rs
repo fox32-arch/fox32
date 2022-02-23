@@ -12,7 +12,7 @@ use memory::Memory;
 use mouse::Mouse;
 
 use std::env;
-use std::fs::read;
+use std::fs::{File, read};
 //use std::process::exit;
 use std::sync::{Arc, mpsc, Mutex};
 use std::thread;
@@ -99,17 +99,6 @@ fn main() {
         Cpu::new(bus)
     };
 
-    if args.len() >= 2 {
-        let input_file_name = &args[1];
-        let opcodes = read(input_file_name).unwrap();
-        //println!("{:02X?}", opcodes);
-        let mut address = 0u32;
-        for byte in opcodes.iter() {
-            cpu.bus.memory.write_8(address, *byte);
-            address += 1;
-        }
-    }
-
     let event_loop = EventLoop::new();
     let mut input = WinitInputHelper::new();
     let window = {
@@ -135,6 +124,9 @@ fn main() {
     let builder = thread::Builder::new().name("cpu".to_string());
     builder.spawn({
         move || {
+            if args.len() > 1 {
+                cpu.bus.disk_controller.insert(File::open(&args[1]).unwrap(), 0);
+            }
             loop {
                 while !cpu.halted {
                     if let Ok(interrupt) = interrupt_receiver.try_recv() {
