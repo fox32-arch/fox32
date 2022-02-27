@@ -895,7 +895,6 @@ impl Cpu {
                                     let result = (self.read_register(register) as u8).overflowing_div(source_value as u8);
                                     self.write_register(register, (self.read_register(register) & 0xFFFFFF00) | (result.0 as u32));
                                     self.flag.zero = result.0 == 0;
-                                    self.flag.carry = result.1;
                                 }
                             }
                             Size::Half => {
@@ -903,7 +902,6 @@ impl Cpu {
                                     let result = (self.read_register(register) as u16).overflowing_div(source_value as u16);
                                     self.write_register(register, (self.read_register(register) & 0xFFFF0000) | (result.0 as u32));
                                     self.flag.zero = result.0 == 0;
-                                    self.flag.carry = result.1;
                                 }
                             }
                             Size::Word => {
@@ -911,7 +909,6 @@ impl Cpu {
                                     let result = self.read_register(register).overflowing_div(source_value);
                                     self.write_register(register, result.0);
                                     self.flag.zero = result.0 == 0;
-                                    self.flag.carry = result.1;
                                 }
                             }
                         }
@@ -926,7 +923,6 @@ impl Cpu {
                                 if should_run {
                                     self.bus.memory.write_8(pointer, result.0);
                                     self.flag.zero = result.0 == 0;
-                                    self.flag.carry = result.1;
                                 }
                             }
                             Size::Half => {
@@ -934,7 +930,6 @@ impl Cpu {
                                 if should_run {
                                     self.bus.memory.write_16(pointer, result.0);
                                     self.flag.zero = result.0 == 0;
-                                    self.flag.carry = result.1;
                                 }
                             }
                             Size::Word => {
@@ -942,7 +937,6 @@ impl Cpu {
                                 if should_run {
                                     self.bus.memory.write_32(pointer, result.0);
                                     self.flag.zero = result.0 == 0;
-                                    self.flag.carry = result.1;
                                 }
                             }
                         }
@@ -956,7 +950,6 @@ impl Cpu {
                                 if should_run {
                                     self.bus.memory.write_8(pointer, result.0);
                                     self.flag.zero = result.0 == 0;
-                                    self.flag.carry = result.1;
                                 }
                             }
                             Size::Half => {
@@ -964,7 +957,6 @@ impl Cpu {
                                 if should_run {
                                     self.bus.memory.write_16(pointer, result.0);
                                     self.flag.zero = result.0 == 0;
-                                    self.flag.carry = result.1;
                                 }
                             }
                             Size::Word => {
@@ -972,7 +964,6 @@ impl Cpu {
                                 if should_run {
                                     self.bus.memory.write_32(pointer, result.0);
                                     self.flag.zero = result.0 == 0;
-                                    self.flag.carry = result.1;
                                 }
                             }
                         }
