@@ -1,6 +1,6 @@
 // memory.rs
 
-use crate::Overlay;
+use crate::{Overlay, warn};
 
 use std::sync::{Arc, Mutex};
 
@@ -50,7 +50,7 @@ impl Memory {
         } else if address >= rom_bottom_address && address <= rom_top_address {
             self.rom[address - rom_bottom_address]
         } else {
-            println!("Warning: attempting to read unmapped memory address: {:#010X}", address);
+            warn(&format!("attempting to read unmapped memory address: {:#010X}", address));
             0
         }
     }
@@ -82,9 +82,9 @@ impl Memory {
             let mut shared_memory_lock = self.shared_memory.lock().unwrap();
             shared_memory_lock[address - shared_bottom_address] = byte;
         } else if address >= rom_bottom_address && address <= rom_top_address {
-            println!("Warning: attempting to write to ROM address: {:#010X}", address);
+            warn(&format!("attempting to write to ROM address: {:#010X}", address));
         } else {
-            println!("Warning: attempting to write to unmapped memory address: {:#010X}", address);
+            warn(&format!("attempting to write to unmapped memory address: {:#010X}", address));
         }
     }
     pub fn write_16(&mut self, address: u32, half: u16) {

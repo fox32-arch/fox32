@@ -13,7 +13,7 @@ use mouse::Mouse;
 
 use std::env;
 use std::fs::{File, read};
-//use std::process::exit;
+use std::process::exit;
 use std::sync::{Arc, mpsc, Mutex};
 use std::thread;
 
@@ -47,9 +47,18 @@ fn read_rom() -> Vec<u8> {
     read("fox32.rom").unwrap_or_else(|_| {
         println!("fox32.rom not found, attempting to open ../fox32rom/fox32.rom instead");
         read("../fox32rom/fox32.rom").unwrap_or_else(|_| {
-            panic!("oh fuck");
+            error("fox32.rom not found!");
         })
     })
+}
+
+pub fn error(message: &str) -> ! {
+    println!("Error: {}", message);
+    exit(1);
+}
+
+pub fn warn(message: &str) {
+    println!("Warning: {}", message);
 }
 
 fn main() {
