@@ -14,6 +14,8 @@
 
 **fox32** attempts to read its ROM from a file called `fox32.rom` in the current directory. If this file isn't found then it falls back to `../fox32rom/fox32.rom`, and if this file isn't found then it exits.
 
+Passing a file as an argument will mount that file as Disk 0.
+
 See [encoding.md](encoding.md) for information about the instruction set.
 
 ## License
