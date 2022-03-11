@@ -169,7 +169,13 @@ fn main() {
 
             let mut shared_memory_lock = shared_memory.lock().expect("failed to lock the shared memory mutex");
             //shared_memory_lock[0x01FFFFFF] = shared_memory_lock[0x01FFFFFF].overflowing_add(1).0; // increment vsync counter
-            let _ = interrupt_sender.send(Interrupt::Request(0xFF)); // vsync interrupt
+            match interrupt_sender.send(Interrupt::Request(0xFF)) { // vsync interrupt
+                Ok(_) => {},
+                Err(_) => {
+                    *control_flow = ControlFlow::Exit;
+                    return;
+                }
+            };
             display.update(&mut *shared_memory_lock);
             drop(shared_memory_lock);
             window.request_redraw();
