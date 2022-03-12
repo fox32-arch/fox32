@@ -8,7 +8,7 @@ pub mod mouse;
 use bus::Bus;
 use cpu::{Cpu, Interrupt};
 use disk::DiskController;
-use memory::Memory;
+use memory::{MEMORY_RAM_START, MEMORY_ROM_START, Memory, MemoryRam};
 use mouse::Mouse;
 
 use std::env;
@@ -74,37 +74,25 @@ fn main() {
     let mut display = Display::new();
     let mouse = Arc::new(Mutex::new(Mouse::new()));
 
-    // 32 MiB of shared memory
-    let shared_memory = Arc::new(Mutex::new(vec![0u8; 0x02000000]));
+    let memory = Memory::new(read_rom().as_slice());
+    let memory_cpu = memory.clone();
+    let memory_eventloop = memory.clone();
 
     let mut cpu = {
-        // 32 MiB of fast memory
-        let cpu_fast_memory = vec![0; 0x02000000];
-        let cpu_shared_memory = Arc::clone(&shared_memory);
-        let cpu_overlays = Arc::clone(&display.overlays);
-        let cpu_read_only_memory = read_rom();
+        let ram_size = memory_cpu.ram().len();
+        let ram_bottom_address = MEMORY_RAM_START;
+        let ram_top_address = ram_bottom_address + ram_size - 1;
+        println!("RAM: {:.2} MiB mapped at {:#010X}-{:#010X}", ram_size / 1048576, ram_bottom_address, ram_top_address);
 
-        let fast_size = cpu_fast_memory.len();
-        let fast_bottom_address = 0x00000000;
-        let fast_top_address = fast_bottom_address + fast_size - 1;
-        println!("Fast:   {:.2} MiB mapped at {:#010X}-{:#010X}", fast_size / 1048576, fast_bottom_address, fast_top_address);
-
-        let shared_size = { cpu_shared_memory.lock().unwrap().len() };
-        let shared_bottom_address = 0x80000000;
-        let shared_top_address = shared_bottom_address + shared_size - 1;
-        println!("Shared: {:.2} MiB mapped at {:#010X}-{:#010X}", shared_size / 1048576, shared_bottom_address, shared_top_address);
-
-        let rom_size = cpu_read_only_memory.len();
-        let rom_bottom_address = 0xF0000000;
+        let rom_size = memory_cpu.rom().len();
+        let rom_bottom_address = MEMORY_ROM_START;
         let rom_top_address = rom_bottom_address + rom_size - 1;
-        println!("ROM:    {:.2} KiB mapped at {:#010X}-{:#010X}", rom_size / 1024, rom_bottom_address, rom_top_address);
+        println!("ROM: {:.2} KiB mapped at {:#010X}-{:#010X}", rom_size / 1024, rom_bottom_address, rom_top_address);
 
-        let memory = Memory::new(cpu_fast_memory, cpu_shared_memory, cpu_overlays, cpu_read_only_memory);
-
-        let cpu_mouse = Arc::clone(&mouse);
-
+        let bus_mouse = Arc::clone(&mouse);
+        let bus_overlays = Arc::clone(&display.overlays);
         let disk_controller = DiskController::new();
-        let bus = Bus { disk_controller, memory, mouse: cpu_mouse };
+        let bus = Bus { disk_controller, memory: memory_cpu, mouse: bus_mouse, overlays: bus_overlays };
         Cpu::new(bus)
     };
 
@@ -167,8 +155,6 @@ fn main() {
         if let Event::MainEventsCleared = event {
             // update internal state and request a redraw
 
-            let mut shared_memory_lock = shared_memory.lock().expect("failed to lock the shared memory mutex");
-            //shared_memory_lock[0x01FFFFFF] = shared_memory_lock[0x01FFFFFF].overflowing_add(1).0; // increment vsync counter
             match interrupt_sender.send(Interrupt::Request(0xFF)) { // vsync interrupt
                 Ok(_) => {},
                 Err(_) => {
@@ -176,8 +162,7 @@ fn main() {
                     return;
                 }
             };
-            display.update(&mut *shared_memory_lock);
-            drop(shared_memory_lock);
+            display.update(memory_eventloop.clone().ram());
             window.request_redraw();
 
             display.draw(pixels.get_frame());
@@ -229,16 +214,16 @@ impl Display {
         }
     }
 
-    fn update(&mut self, shared_memory: &mut [u8]) {
+    fn update(&mut self, ram: &MemoryRam) {
         let overlay_lock = self.overlays.lock().unwrap();
 
         for i in 0..(HEIGHT*WIDTH*4) as usize {
-            self.background[i] = shared_memory[i];
+            self.background[i] = ram[0x02000000 + i];
         }
 
         for index in 0..=31 {
             if overlay_lock[index].enabled {
-                blit_overlay(&mut self.background, &overlay_lock[index], shared_memory);
+                blit_overlay(&mut self.background, &overlay_lock[index], ram);
             }
         }
     }
@@ -257,7 +242,7 @@ impl Display {
 }
 
 // modified from https://github.com/parasyte/pixels/blob/main/examples/invaders/simple-invaders/src/sprites.rs
-fn blit_overlay(framebuffer: &mut [u8], overlay: &Overlay, shared_memory: &mut [u8]) {
+fn blit_overlay(framebuffer: &mut [u8], overlay: &Overlay, ram: &[u8]) {
     //assert!(overlay.x + overlay.width <= WIDTH);
     //assert!(overlay.y + overlay.height <= HEIGHT);
 
@@ -277,7 +262,7 @@ fn blit_overlay(framebuffer: &mut [u8], overlay: &Overlay, shared_memory: &mut [
         //println!("height: {}, difference: {}", height, difference);
     }
 
-    let overlay_framebuffer = &shared_memory[overlay.framebuffer_pointer as usize..(overlay.framebuffer_pointer+((width as u32)*(height as u32))) as usize];
+    let overlay_framebuffer = &ram[(overlay.framebuffer_pointer as usize)..((overlay.framebuffer_pointer+((width as u32)*(height as u32))) as usize)];
 
     let mut overlay_framebuffer_index = 0;
     for y in 0..height {

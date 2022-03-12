@@ -24,10 +24,7 @@ impl std::convert::From<u8> for Flag {
     fn from(byte: u8) -> Self {
         let carry = ((byte >> 1) & 1) != 0;
         let zero  = ((byte >> 0) & 1) != 0;
-        Flag {
-            carry,
-            zero,
-        }
+        Flag { carry, zero }
     }
 }
 

@@ -1,6 +1,6 @@
 // bus.rs
 
-use crate::{DiskController, Memory, Mouse};
+use crate::{DiskController, Memory, Mouse, Overlay};
 
 use std::io::{stdout, Write};
 use std::sync::{Arc, Mutex};
@@ -9,13 +9,14 @@ pub struct Bus {
     pub disk_controller: DiskController,
     pub memory: Memory,
     pub mouse: Arc<Mutex<Mouse>>,
+    pub overlays: Arc<Mutex<Vec<Overlay>>>,
 }
 
 impl Bus {
     pub fn read_io(&mut self, port: u32) -> u32 {
         match port {
             0x80000000..=0x8000031F => { // overlay port
-                let overlay_lock = self.memory.overlays.lock().unwrap();
+                let overlay_lock = self.overlays.lock().unwrap();
                 let overlay_number = (port & 0x000000FF) as usize;
                 let setting = (port & 0x0000FF00) >> 8;
 
@@ -34,7 +35,7 @@ impl Bus {
                     }
                     0x02 => {
                         // we're reading the framebuffer pointer of this overlay
-                        overlay_lock[overlay_number].framebuffer_pointer + 0x80000000
+                        overlay_lock[overlay_number].framebuffer_pointer
                     }
                     0x03 => {
                         // we're reading the enable status of this overlay
@@ -106,7 +107,7 @@ impl Bus {
                 stdout().flush().expect("could not flush stdout");
             }
             0x80000000..=0x8000031F => { // overlay port
-                let mut overlay_lock = self.memory.overlays.lock().unwrap();
+                let mut overlay_lock = self.overlays.lock().unwrap();
                 let overlay_number = (port & 0x000000FF) as usize;
                 let setting = (port & 0x0000FF00) >> 8;
 
@@ -127,10 +128,7 @@ impl Bus {
                     }
                     0x02 => {
                         // we're setting the framebuffer pointer of this overlay
-                        if word < 0x80000000 {
-                            panic!("overlay framebuffer must be within shared memory");
-                        }
-                        overlay_lock[overlay_number].framebuffer_pointer = word - 0x80000000;
+                        overlay_lock[overlay_number].framebuffer_pointer = word;
                     }
                     0x03 => {
                         // we're setting the enable status of this overlay
