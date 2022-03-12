@@ -22,13 +22,17 @@ If the instruction doesn't allow variable sizes or a size was not specified, set
 | 3-  |      | DEC[.8,16,32] | REM[.8,16,32] | NOT[.8,16,32] |               |               |               |                |      | RTA   | RETI           |     |     |     |     |     |
 
 # Condition table
-|       |          |
-| :---: | -------- |
-| 0b000 | (always) |
-| 0b001 | IFZ      |
-| 0b010 | IFNZ     |
-| 0b011 | IFC      |
-| 0b100 | IFNC     |
+|       |        |                                               |
+| :---: | ------ | --------------------------------------------- |
+| 0b000 | ---    | always                                        |
+| 0b001 | IFZ    | zero                                          |
+| 0b010 | IFNZ   | not zero                                      |
+| 0b011 | IFC    | carry                                         |
+| 0b011 | IFLT   | less than (equivalent to IFC)                 |
+| 0b100 | IFNC   | not carry                                     |
+| 0b100 | IFGTEQ | greater than or equal to (equivalent to IFNC) |
+| 0b101 | IFGT   | greater than                                  |
+| 0b110 | IFLTEQ | less than or equal to                         |
 
 # Destination table
 |      |                     |

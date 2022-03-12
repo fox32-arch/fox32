@@ -73,6 +73,8 @@ impl Cpu {
             Condition::NotZero => !self.flag.zero,
             Condition::Carry => self.flag.carry,
             Condition::NotCarry => !self.flag.carry,
+            Condition::GreaterThan => !self.flag.carry && !self.flag.zero,
+            Condition::LessThanEqualTo => self.flag.carry || self.flag.zero,
         }
     }
     fn relative_to_absolute(&self, relative_address: u32) -> u32 {
@@ -2689,6 +2691,10 @@ enum Condition {
     NotZero,
     Carry,
     NotCarry,
+    GreaterThan,
+    // GreaterThanEqualTo is equivalent to NotCarry
+    // LessThan is equivalent to Carry
+    LessThanEqualTo,
 }
 
 #[derive(Debug)]
@@ -2783,6 +2789,8 @@ impl Instruction {
             0x20 => Condition::NotZero,
             0x30 => Condition::Carry,
             0x40 => Condition::NotCarry,
+            0x50 => Condition::GreaterThan,
+            0x60 => Condition::LessThanEqualTo,
             _ => return None,
         };
         match opcode {
