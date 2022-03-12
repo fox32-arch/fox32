@@ -1,5 +1,7 @@
 // disk.rs
 
+use crate::memory::MemoryRam;
+
 use std::fs::File;
 use std::io::{Seek, SeekFrom, Read, Write};
 use rfd::FileDialog;
@@ -22,14 +24,14 @@ impl Disk {
 
 pub struct DiskController {
     pub disk: [Option<Disk>; 4],
-    pub sector_buffer: [u8; 512],
+    pub buffer_pointer: usize,
 }
 
 impl DiskController {
     pub fn new() -> Self {
         DiskController {
             disk: [None, None, None, None],
-            sector_buffer: [0; 512]
+            buffer_pointer: 0x00000000
         }
     }
     pub fn select_file(&self) -> Option<File> {
@@ -64,18 +66,18 @@ impl DiskController {
         let disk = self.disk[disk_id as usize].as_mut().expect("attempted to access unmounted disk");
         disk.current_sector
     }
-    pub fn read_into_buffer(&mut self, disk_id: u8) -> usize {
+    pub fn read_into_memory(&mut self, disk_id: u8, ram: &mut MemoryRam) -> usize {
         let disk = self.disk[disk_id as usize].as_mut().expect("attempted to access unmounted disk");
         let mut temp_buffer = [0u8; 512];
 
         let number_of_bytes_read = disk.file.read(&mut temp_buffer).unwrap();
-        self.sector_buffer = temp_buffer;
+        ram[self.buffer_pointer..self.buffer_pointer+512].copy_from_slice(&temp_buffer);
         number_of_bytes_read
     }
-    pub fn write_from_buffer(&mut self, disk_id: u8) -> usize {
+    pub fn write_from_memory(&mut self, disk_id: u8, ram: &MemoryRam) -> usize {
         let disk = self.disk[disk_id as usize].as_mut().expect("attempted to access unmounted disk");
 
-        let number_of_bytes_written = disk.file.write(&mut self.sector_buffer).unwrap();
+        let number_of_bytes_written = disk.file.write(ram.get(self.buffer_pointer..self.buffer_pointer+512).unwrap()).unwrap();
         number_of_bytes_written
     }
 }

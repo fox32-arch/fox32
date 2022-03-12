@@ -88,11 +88,8 @@ impl Bus {
                         }
                     }
                     0x20 => {
-                        // we're reading from the sector buffer
-                        if address_or_id > 512 {
-                            panic!("attempted to read past the end of the disk controller sector buffer");
-                        }
-                        self.disk_controller.sector_buffer[address_or_id] as u32
+                        // we're getting the location of the memory sector buffer
+                        self.disk_controller.buffer_pointer as u32
                     }
                     _ => panic!("invalid disk controller port"),
                 }
@@ -174,27 +171,24 @@ impl Bus {
                         };
                     }
                     0x20 => {
-                        // we're writing to the sector buffer
-                        if address_or_id > 512 {
-                            panic!("attempted to read past the end of the disk controller sector buffer");
-                        }
-                        self.disk_controller.sector_buffer[address_or_id] = word as u8;
+                        // we're setting the location of the memory sector buffer
+                        self.disk_controller.buffer_pointer = word as usize;
                     }
                     0x30 => {
-                        // we're reading the specified sector of the specified disk id into the sector buffer
+                        // we're reading the specified sector of the specified disk id into the memory sector buffer
                         if address_or_id > 3 {
                             panic!("invalid disk ID");
                         }
                         self.disk_controller.set_current_sector(address_or_id as u8, word);
-                        self.disk_controller.read_into_buffer(address_or_id as u8);
+                        self.disk_controller.read_into_memory(address_or_id as u8, self.memory.ram());
                     }
                     0x40 => {
-                        // we're writing the specified sector to the specified disk id from the sector buffer
+                        // we're writing the specified sector to the specified disk id from the memory sector buffer
                         if address_or_id > 3 {
                             panic!("invalid disk ID");
                         }
                         self.disk_controller.set_current_sector(address_or_id as u8, word);
-                        self.disk_controller.write_from_buffer(address_or_id as u8);
+                        self.disk_controller.write_from_memory(address_or_id as u8, self.memory.ram());
                     }
                     _ => panic!("invalid disk controller port"),
                 }
