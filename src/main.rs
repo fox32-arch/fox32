@@ -17,12 +17,13 @@ use std::process::exit;
 use std::sync::{Arc, mpsc, Mutex};
 use std::thread;
 
+use image;
 use log::error;
 use pixels::{Pixels, SurfaceTexture};
 use winit::dpi::LogicalSize;
 use winit::event::{Event, VirtualKeyCode};
 use winit::event_loop::{ControlFlow, EventLoop};
-use winit::window::WindowBuilder;
+use winit::window::{WindowBuilder, Icon};
 use winit_input_helper::WinitInputHelper;
 
 const WIDTH: usize = 640;
@@ -98,12 +99,14 @@ fn main() {
 
     let event_loop = EventLoop::new();
     let mut input = WinitInputHelper::new();
+    let icon = image::load_from_memory(include_bytes!("../../docs/logos/32.png")).unwrap();
     let window = {
         let size = LogicalSize::new(WIDTH as f64, HEIGHT as f64);
         WindowBuilder::new()
             .with_title(version_string)
             .with_inner_size(size)
             .with_min_inner_size(size)
+            .with_window_icon(Some(Icon::from_rgba(icon.as_bytes().to_vec(), 128, 128).unwrap()))
             .build(&event_loop)
             .unwrap()
     };
