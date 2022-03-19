@@ -1,12 +1,13 @@
 // bus.rs
 
-use crate::{DiskController, Memory, Mouse, Overlay};
+use crate::{DiskController, Keyboard, Memory, Mouse, Overlay};
 
 use std::io::{stdout, Write};
 use std::sync::{Arc, Mutex};
 
 pub struct Bus {
     pub disk_controller: DiskController,
+    pub keyboard: Arc<Mutex<Keyboard>>,
     pub memory: Memory,
     pub mouse: Arc<Mutex<Mouse>>,
     pub overlays: Arc<Mutex<Vec<Overlay>>>,
@@ -72,17 +73,21 @@ impl Bus {
                     _ => panic!("invalid mouse control port"),
                 }
             }
-            0x80001000..=0x80002200 => { // disk controller port
-                let address_or_id = (port & 0x00000FFF) as usize;
+            0x80000500 => { // keyboard port
+                let mut keyboard_lock = self.keyboard.lock().expect("failed to lock the keyboard mutex");
+                keyboard_lock.pop() as u32
+            }
+            0x80001000..=0x80002003 => { // disk controller port
+                let id = port as u8;
                 let operation = (port & 0x0000F000) >> 8;
 
                 match operation {
                     0x10 => {
                         // we're reading the current insert state of the specified disk id
-                        if address_or_id > 3 {
+                        if id > 3 {
                             panic!("invalid disk ID");
                         }
-                        match &self.disk_controller.disk[address_or_id] {
+                        match &self.disk_controller.disk[id as usize] {
                             Some(disk) => disk.size as u32, // return size if this disk is inserted
                             None => 0, // return 0 if this disk is not inserted
                         }
@@ -154,19 +159,19 @@ impl Bus {
                     _ => panic!("invalid mouse control port"),
                 }
             }
-            0x80001000..=0x80004200 => { // disk controller port
-                let address_or_id = (port & 0x00000FFF) as usize;
+            0x80001000..=0x80004003 => { // disk controller port
+                let id = port as u8;
                 let operation = (port & 0x0000F000) >> 8;
 
                 match operation {
                     0x10 => {
                         // we're requesting a disk to be inserted to the specified disk id
-                        if address_or_id > 3 {
+                        if id > 3 {
                             panic!("invalid disk ID");
                         }
                         let file = self.disk_controller.select_file();
                         match file {
-                            Some(file) => self.disk_controller.insert(file, address_or_id as u8),
+                            Some(file) => self.disk_controller.insert(file, id),
                             None => {},
                         };
                     }
@@ -176,19 +181,19 @@ impl Bus {
                     }
                     0x30 => {
                         // we're reading the specified sector of the specified disk id into the memory sector buffer
-                        if address_or_id > 3 {
+                        if id > 3 {
                             panic!("invalid disk ID");
                         }
-                        self.disk_controller.set_current_sector(address_or_id as u8, word);
-                        self.disk_controller.read_into_memory(address_or_id as u8, self.memory.ram());
+                        self.disk_controller.set_current_sector(id, word);
+                        self.disk_controller.read_into_memory(id, self.memory.ram());
                     }
                     0x40 => {
                         // we're writing the specified sector to the specified disk id from the memory sector buffer
-                        if address_or_id > 3 {
+                        if id > 3 {
                             panic!("invalid disk ID");
                         }
-                        self.disk_controller.set_current_sector(address_or_id as u8, word);
-                        self.disk_controller.write_from_memory(address_or_id as u8, self.memory.ram());
+                        self.disk_controller.set_current_sector(id, word);
+                        self.disk_controller.write_from_memory(id, self.memory.ram());
                     }
                     _ => panic!("invalid disk controller port"),
                 }

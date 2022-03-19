@@ -3,11 +3,13 @@
 pub mod bus;
 pub mod cpu;
 pub mod disk;
+pub mod keyboard;
 pub mod memory;
 pub mod mouse;
 use bus::Bus;
 use cpu::{Cpu, Interrupt};
 use disk::DiskController;
+use keyboard::Keyboard;
 use memory::{MEMORY_RAM_START, MEMORY_ROM_START, Memory, MemoryRam};
 use mouse::Mouse;
 
@@ -21,7 +23,7 @@ use image;
 use log::error;
 use pixels::{Pixels, SurfaceTexture};
 use winit::dpi::LogicalSize;
-use winit::event::{Event, VirtualKeyCode};
+use winit::event::{ElementState, Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::{WindowBuilder, Icon};
 use winit_input_helper::WinitInputHelper;
@@ -73,6 +75,7 @@ fn main() {
     }*/
 
     let mut display = Display::new();
+    let keyboard = Arc::new(Mutex::new(Keyboard::new()));
     let mouse = Arc::new(Mutex::new(Mouse::new()));
 
     let memory = Memory::new(read_rom().as_slice());
@@ -90,10 +93,11 @@ fn main() {
         let rom_top_address = rom_bottom_address + rom_size - 1;
         println!("ROM: {:.2} KiB mapped at {:#010X}-{:#010X}", rom_size / 1024, rom_bottom_address, rom_top_address);
 
+        let bus_keyboard = Arc::clone(&keyboard);
         let bus_mouse = Arc::clone(&mouse);
         let bus_overlays = Arc::clone(&display.overlays);
         let disk_controller = DiskController::new();
-        let bus = Bus { disk_controller, memory: memory_cpu, mouse: bus_mouse, overlays: bus_overlays };
+        let bus = Bus { disk_controller, keyboard: bus_keyboard, memory: memory_cpu, mouse: bus_mouse, overlays: bus_overlays };
         Cpu::new(bus)
     };
 
@@ -180,9 +184,21 @@ fn main() {
         }
 
         // handle input events
+        if let Event::WindowEvent { ref event, .. } = event {
+            if let WindowEvent::KeyboardInput { input, .. } = event {
+                let mut keyboard_lock = keyboard.lock().unwrap();
+                let mut scancode = input.scancode;
+                if input.state == ElementState::Released {
+                    scancode |= 0x80; // "break" scancode
+                }
+                println!("scancode: {:x}", scancode);
+                keyboard_lock.push(scancode);
+            }
+        }
+
         if input.update(&event) {
             // close events
-            if input.key_pressed(VirtualKeyCode::Escape) || input.quit() {
+            if input.quit() {
                 *control_flow = ControlFlow::Exit;
                 return;
             }

@@ -739,6 +739,7 @@ dependencies = [
  "log",
  "pixels",
  "rfd",
+ "ringbuf",
  "vergen",
  "winit",
  "winit_input_helper",
@@ -1961,6 +1962,15 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "windows",
+]
+
+[[package]]
+name = "ringbuf"
+version = "0.2.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd3064490f4a0c5bc127544803fbc2bb5f77ec5170f0208f2d7b605a4f396d44"
+dependencies = [
+ "cache-padded",
 ]
 
 [[package]]

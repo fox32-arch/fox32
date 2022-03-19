@@ -12,6 +12,7 @@ image = "0.24"
 log = "0.4"
 pixels = "0.9.0"
 rfd = "0.7.0"
+ringbuf = "0.2"
 winit = "0.26"
 winit_input_helper = "0.11"
 
