@@ -1,6 +1,6 @@
 // memory.rs
 
-use crate::warn;
+use crate::error;
 
 use std::cell::UnsafeCell;
 use std::sync::Arc;
@@ -66,8 +66,7 @@ impl Memory {
                 *value
             }
             None => {
-                warn(&format!("attempting to read from unmapped memory address: {:#010X}", address));
-                0
+                error(&format!("attempting to read from unmapped memory address: {:#010X}", address));
             }
         }
     }
@@ -86,8 +85,7 @@ impl Memory {
         let address = address as usize;
 
         if address >= MEMORY_ROM_START && address < MEMORY_ROM_START + MEMORY_ROM_SIZE {
-            warn(&format!("attempting to write to ROM address: {:#010X}", address));
-            return;
+            error(&format!("attempting to write to ROM address: {:#010X}", address));
         }
 
         match self.ram().get_mut(address - MEMORY_RAM_START) {
@@ -95,7 +93,7 @@ impl Memory {
                 *value = byte;
             }
             None => {
-                warn(&format!("attempting to write to unmapped memory address: {:#010X}", address));
+                error(&format!("attempting to write to unmapped memory address: {:#010X}", address));
             }
         }
     }
