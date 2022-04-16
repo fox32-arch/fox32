@@ -217,9 +217,13 @@ fn main() {
             let mut mouse_lock = mouse.lock().expect("failed to lock the mouse mutex");
             mouse_lock.x = mouse_pixel.0;
             mouse_lock.y = mouse_pixel.1;
+            if mouse_lock.held && !input.mouse_held(0) {
+                // mouse button was released this frame
+                mouse_lock.released = true;
+            }
             mouse_lock.held = input.mouse_held(0);
             if input.mouse_pressed(0) {
-                mouse_lock.click = true;
+                mouse_lock.clicked = true;
             }
         }
     });

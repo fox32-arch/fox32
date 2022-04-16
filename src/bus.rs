@@ -51,15 +51,17 @@ impl Bus {
                     0x00 => {
                         // we're reading the button states
                         let mut byte: u8 = 0x00;
-                        let mut mouse_lock = self.mouse.lock().expect("failed to lock the mouse mutex");
-                        if mouse_lock.click {
-                            byte |= 0b01;
-                            mouse_lock.click = false;
+                        let mouse_lock = self.mouse.lock().expect("failed to lock the mouse mutex");
+                        if mouse_lock.clicked {
+                            byte |= 0b001;
+                        }
+                        if mouse_lock.released {
+                            byte |= 0b010;
                         }
                         if mouse_lock.held {
-                            byte |= 0b10;
+                            byte |= 0b100;
                         } else {
-                            byte &= !0b10;
+                            byte &= !0b100;
                         }
                         byte as u32
                     }
@@ -145,8 +147,9 @@ impl Bus {
                     0x00 => {
                         // we're setting the button states
                         let mut mouse_lock = self.mouse.lock().expect("failed to lock the mouse mutex");
-                        mouse_lock.click = word & (1 << 0) != 0;
-                        mouse_lock.held = word & (1 << 1) != 0;
+                        mouse_lock.clicked = word & (1 << 0) != 0;
+                        mouse_lock.released = word & (1 << 1) != 0;
+                        mouse_lock.held = word & (1 << 2) != 0;
                     }
                     0x01 => {
                         // we're setting the position
