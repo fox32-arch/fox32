@@ -268,6 +268,8 @@ impl Cpu {
             println!("{:#010X}: bad opcode {:#06X}", self.instruction_pointer, opcode);
             println!("size instr  . cond dest src");
             println!("{:02b}   {:06b} {:01b} {:03b}  {:02b}   {:02b}", size, instruction, empty, condition, destination, source);
+            println!("dumping RAM");
+            self.bus.memory.dump();
             panic!("bad opcode");
         }
     }

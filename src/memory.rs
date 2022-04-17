@@ -5,6 +5,7 @@ use crate::error;
 use std::cell::UnsafeCell;
 use std::sync::Arc;
 use std::io::Write;
+use std::fs::File;
 
 pub const MEMORY_RAM_SIZE: usize = 0x04000000; // 64 MiB
 pub const MEMORY_ROM_SIZE: usize = 0x00080000; // 512 KiB
@@ -53,6 +54,11 @@ impl Memory {
 
     pub fn ram(&self) -> &mut MemoryRam { &mut self.inner().ram }
     pub fn rom(&self) -> &mut MemoryRom { &mut self.inner().rom }
+
+    pub fn dump(&self) {
+        let mut file = File::create("memory.dump").expect("failed to open memory dump file");
+        file.write_all(self.ram()).expect("failed to write memory dump file");
+    }
 
     pub fn read_8(&self, address: u32) -> u8 {
         let address = address as usize;
