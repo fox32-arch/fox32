@@ -162,7 +162,7 @@ impl Bus {
                     _ => panic!("invalid mouse control port"),
                 }
             }
-            0x80001000..=0x80004003 => { // disk controller port
+            0x80001000..=0x80005003 => { // disk controller port
                 let id = port as u8;
                 let operation = (port & 0x0000F000) >> 8;
 
@@ -197,6 +197,13 @@ impl Bus {
                         }
                         self.disk_controller.set_current_sector(id, word);
                         self.disk_controller.write_from_memory(id, self.memory.ram());
+                    }
+                    0x50 => {
+                        // we're requesting a disk to be removed from the specified disk id
+                        if id > 3 {
+                            panic!("invalid disk ID");
+                        }
+                        self.disk_controller.remove(id);
                     }
                     _ => panic!("invalid disk controller port"),
                 }
