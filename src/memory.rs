@@ -23,8 +23,10 @@ struct MemoryInner {
 impl MemoryInner {
     pub fn new(rom: &[u8]) -> Self {
         let mut this = Self {
-            ram: Box::new([0u8; MEMORY_RAM_SIZE]),
-            rom: Box::new([0u8; MEMORY_ROM_SIZE]),
+            // HACK: allocate directly on the heap to avoid a stack overflow
+            //       at runtime while trying to move around a 64MB array
+            ram: unsafe { Box::from_raw(Box::into_raw(vec![0u8; MEMORY_RAM_SIZE].into_boxed_slice()) as *mut MemoryRam) },
+            rom: unsafe { Box::from_raw(Box::into_raw(vec![0u8; MEMORY_ROM_SIZE].into_boxed_slice()) as *mut MemoryRom) },
         };
         this.rom.as_mut_slice().write(rom).expect("failed to copy ROM to memory");
         this
