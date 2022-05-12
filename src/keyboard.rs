@@ -17,12 +17,10 @@ impl Keyboard {
     }
 
     pub fn push(&mut self, scancode: u32) {
-        self.producer.push(scancode).unwrap_or_else(|_| {
-            warn("keyboard buffer full!");
-        });
+        self.producer.push(scancode).unwrap_or_else(|_| warn("keyboard buffer full!"));
     }
 
     pub fn pop(&mut self) -> u32 {
-        self.consumer.pop().unwrap_or_else(|| 0)
+        self.consumer.pop().unwrap_or_default()
     }
 }

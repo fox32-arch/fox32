@@ -1,23 +1,31 @@
 // main.rs
 
+pub mod memory;
 pub mod bus;
 pub mod cpu;
-pub mod disk;
 pub mod keyboard;
-pub mod memory;
 pub mod mouse;
+pub mod disk;
+pub mod runtime;
+pub mod wrapped;
+
 use bus::Bus;
 use cpu::{Cpu, Interrupt};
-use disk::DiskController;
 use keyboard::Keyboard;
-use memory::{MEMORY_RAM_START, MEMORY_ROM_START, Memory, MemoryRam};
 use mouse::Mouse;
+use disk::DiskController;
+use memory::{MEMORY_RAM_START, MEMORY_ROM_START, MemoryRam, Memory, MemoryStub, MemoryBuffer};
+use runtime::Runtime;
+use wrapped::*;
 
-use std::env;
-use std::fs::{File, read};
-use std::process::exit;
+use std::io::Write;
+use std::mem;
+use std::ops::Deref;
 use std::sync::{Arc, mpsc, Mutex};
 use std::thread;
+use std::process::exit;
+use std::env;
+use std::fs::{File, read};
 
 use image;
 use log::error;
@@ -78,28 +86,60 @@ fn main() {
     let keyboard = Arc::new(Mutex::new(Keyboard::new()));
     let mouse = Arc::new(Mutex::new(Mouse::new()));
 
-    let memory = Memory::new(read_rom().as_slice());
+    let mut bus = Bus {
+        memory: Box::new(MemoryStub()),
+        disk_controller: DiskController::new(),
+        keyboard: keyboard.clone(),
+        mouse: mouse.clone(),
+        overlays: display.overlays.clone(),
+    };
+
+    if args.len() > 1 {
+        bus.disk_controller.insert(File::open(&args[1]).expect("failed to load provided disk image"), 0);
+    }
+
+    let (mut runtime, memory): (Box<dyn Runtime>, MemoryWrapped) = {
+        if env::var("FOX32_RUNTIME").unwrap_or_default() == "core" {
+
+            println!("Using \"fox32core\" runtime");
+
+            let bus_wrapped = BusWrapped::new(bus);
+            let state_wrapped = CoreWrapped::new(fox32core::State::new(bus_wrapped.clone()));
+            let state_memory_wrapped = MemoryWrapped::new(CoreMemoryWrapped::new(state_wrapped.clone()));
+
+            mem::drop(mem::replace(&mut bus_wrapped.deref().borrow_mut().memory, Box::new(state_memory_wrapped.clone())));
+
+            (Box::new(state_wrapped.clone()), state_memory_wrapped.clone())
+
+        } else {
+
+            println!("Using \"rust\" runtime");
+
+            let memory = MemoryWrapped::new(MemoryBuffer::new());
+
+            mem::drop(mem::replace(&mut bus.memory, Box::new(memory.clone())));
+
+            (Box::new(Cpu::new(bus)), memory)
+
+        }
+    };
+
+    memory.rom().as_mut_slice().write(read_rom().as_slice()).expect("failed to write ROM");
+
+    runtime.halted_set(false);
+
     let memory_cpu = memory.clone();
     let memory_eventloop = memory.clone();
 
-    let mut cpu = {
-        let ram_size = memory_cpu.ram().len();
-        let ram_bottom_address = MEMORY_RAM_START;
-        let ram_top_address = ram_bottom_address + ram_size - 1;
-        println!("RAM: {:.2} MiB mapped at {:#010X}-{:#010X}", ram_size / 1048576, ram_bottom_address, ram_top_address);
+    let ram_size = memory_cpu.ram().len();
+    let ram_bottom_address = MEMORY_RAM_START;
+    let ram_top_address = ram_bottom_address + ram_size - 1;
+    println!("RAM: {:.2} MiB mapped at {:#010X}-{:#010X}", ram_size / 1048576, ram_bottom_address, ram_top_address);
 
-        let rom_size = memory_cpu.rom().len();
-        let rom_bottom_address = MEMORY_ROM_START;
-        let rom_top_address = rom_bottom_address + rom_size - 1;
-        println!("ROM: {:.2} KiB mapped at {:#010X}-{:#010X}", rom_size / 1024, rom_bottom_address, rom_top_address);
-
-        let bus_keyboard = Arc::clone(&keyboard);
-        let bus_mouse = Arc::clone(&mouse);
-        let bus_overlays = Arc::clone(&display.overlays);
-        let disk_controller = DiskController::new();
-        let bus = Bus { disk_controller, keyboard: bus_keyboard, memory: memory_cpu, mouse: bus_mouse, overlays: bus_overlays };
-        Cpu::new(bus)
-    };
+    let rom_size = memory_cpu.rom().len();
+    let rom_bottom_address = MEMORY_ROM_START;
+    let rom_top_address = rom_bottom_address + rom_size - 1;
+    println!("ROM: {:.2} KiB mapped at {:#010X}-{:#010X}", rom_size / 1024, rom_bottom_address, rom_top_address);
 
     let event_loop = EventLoop::new();
     let mut input = WinitInputHelper::new();
@@ -123,29 +163,26 @@ fn main() {
         Pixels::new(WIDTH as u32, HEIGHT as u32, surface_texture).unwrap()
     };
 
-    let (interrupt_sender, interrupt_receiver) = mpsc::channel::<Interrupt>();
+    let (interrupt_sender, interrupt_receiver) = mpsc::channel::<u16>();
 
     let builder = thread::Builder::new().name("cpu".to_string());
     builder.spawn({
         move || {
-            if args.len() > 1 {
-                cpu.bus.disk_controller.insert(File::open(&args[1]).unwrap(), 0);
-            }
             loop {
-                while !cpu.halted {
+                while !runtime.halted_get() {
                     if let Ok(interrupt) = interrupt_receiver.try_recv() {
-                        cpu.interrupt(interrupt);
+                        runtime.raise(interrupt);
                     }
-                    cpu.execute_memory_instruction();
+                    runtime.step();
                 }
-                if !cpu.interrupts_enabled {
+                if !runtime.interrupts_enabled_get() {
                     // the cpu was halted and interrupts are disabled
                     // at this point, the cpu is dead and cannot resume, break out of the loop
                     break;
                 }
                 if let Ok(interrupt) = interrupt_receiver.recv() {
-                    cpu.halted = false;
-                    cpu.interrupt(interrupt);
+                    runtime.halted_set(false);
+                    runtime.raise(interrupt);
                 } else {
                     // sender is closed, break
                     break;
@@ -162,7 +199,7 @@ fn main() {
         if let Event::MainEventsCleared = event {
             // update internal state and request a redraw
 
-            match interrupt_sender.send(Interrupt::Request(0xFF)) { // vsync interrupt
+            match interrupt_sender.send(0xFF) { // vsync interrupt
                 Ok(_) => {},
                 Err(_) => {
                     *control_flow = ControlFlow::Exit;
