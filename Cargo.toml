@@ -20,7 +20,3 @@ winit_input_helper = "0.11"
 [build-dependencies]
 anyhow = "1.0"
 vergen = { version = "6", default-features = false, features = ["build", "git"] }
-
-[profile.release]
-opt-level = 3
-lto = "fat"

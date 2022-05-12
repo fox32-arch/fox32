@@ -61,7 +61,7 @@ impl Runtime for fox32core::State {
     }
 
     fn step(&mut self) {
-        if let Some(error) = fox32core::State::resume(self, 8192) {
+        if let Some(error) = fox32core::State::step(self) {
             panic!("fox32core failed to execute next instruction: {}", error);
         }
     }
