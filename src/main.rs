@@ -104,7 +104,9 @@ fn main() {
             println!("Using \"fox32core\" runtime");
 
             let bus_wrapped = BusWrapped::new(bus);
-            let state_wrapped = CoreWrapped::new(fox32core::State::new(bus_wrapped.clone()));
+            let state = fox32core::State::new(bus_wrapped.clone());
+            *state.debug() = env::var("FOX32_DEBUG").is_ok();
+            let state_wrapped = CoreWrapped::new(state);
             let state_memory_wrapped = MemoryWrapped::new(CoreMemoryWrapped::new(state_wrapped.clone()));
 
             mem::drop(mem::replace(&mut bus_wrapped.deref().borrow_mut().memory, Box::new(state_memory_wrapped.clone())));
