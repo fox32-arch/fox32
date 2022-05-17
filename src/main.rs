@@ -177,7 +177,7 @@ fn main() {
                     }
                     runtime.step();
                 }
-                if !runtime.interrupts_enabled_get() {
+                if !runtime.flag_interrupt_get() {
                     // the cpu was halted and interrupts are disabled
                     // at this point, the cpu is dead and cannot resume, break out of the loop
                     break;

@@ -82,11 +82,11 @@ impl Runtime for CoreWrapped {
         unsafe { (*self.inner()).halted_set(halted) }
     }
 
-    fn interrupts_enabled_get(&mut self) -> bool {
-        unsafe { (*self.inner()).interrupts_enabled_get() }
+    fn flag_interrupt_get(&mut self) -> bool {
+        unsafe { (*self.inner()).flag_interrupt_get() }
     }
-    fn interrupts_enabled_set(&mut self, interrupts_enabled: bool) {
-        unsafe { (*self.inner()).interrupts_enabled_set(interrupts_enabled) }
+    fn flag_interrupt_set(&mut self, flag_interrupt: bool) {
+        unsafe { (*self.inner()).flag_interrupt_set(flag_interrupt) }
     }
 
     fn raise(&mut self, vector: u16) {
@@ -114,4 +114,3 @@ impl Memory for CoreMemoryWrapped {
     fn ram(&self) -> &mut MemoryRam { self.0.ram() }
     fn rom(&self) -> &mut MemoryRom { self.0.rom() }
 }
-

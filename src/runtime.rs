@@ -4,8 +4,8 @@ pub trait Runtime: Send {
     fn halted_get(&mut self) -> bool;
     fn halted_set(&mut self, halted: bool);
 
-    fn interrupts_enabled_get(&mut self) -> bool;
-    fn interrupts_enabled_set(&mut self, interrupts_enabled: bool);
+    fn flag_interrupt_get(&mut self) -> bool;
+    fn flag_interrupt_set(&mut self, flag_interrupt: bool);
 
     fn raise(&mut self, vector: u16);
 
@@ -20,11 +20,11 @@ impl Runtime for crate::Cpu {
         self.halted = halted
     }
 
-    fn interrupts_enabled_get(&mut self) -> bool {
-        self.interrupts_enabled
+    fn flag_interrupt_get(&mut self) -> bool {
+        self.flag.interrupt
     }
-    fn interrupts_enabled_set(&mut self, interrupts_enabled: bool) {
-        self.interrupts_enabled = interrupts_enabled
+    fn flag_interrupt_set(&mut self, flag_interrupt: bool) {
+        self.flag.interrupt = flag_interrupt
     }
 
     fn raise(&mut self, vector: u16) {
@@ -44,11 +44,11 @@ impl Runtime for fox32core::State {
         *self.halted() = halted;
     }
 
-    fn interrupts_enabled_get(&mut self) -> bool {
-        *self.interrupts_enabled()
+    fn flag_interrupt_get(&mut self) -> bool {
+        *self.flag_interrupt()
     }
-    fn interrupts_enabled_set(&mut self, interrupts_enabled: bool) {
-        *self.interrupts_enabled() = interrupts_enabled;
+    fn flag_interrupt_set(&mut self, flag_interrupt: bool) {
+        *self.flag_interrupt() = flag_interrupt;
     }
 
     fn raise(&mut self, vector: u16) {

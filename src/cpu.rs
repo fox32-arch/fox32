@@ -9,22 +9,25 @@ const DEBUG: bool = false;
 
 #[derive(Copy, Clone)]
 pub struct Flag {
+    pub interrupt: bool,
     pub carry: bool,
     pub zero: bool,
 }
 
 impl std::convert::From<Flag> for u8  {
     fn from(flag: Flag) -> u8 {
-        (if flag.carry { 1 } else { 0 }) << 1 |
-        (if flag.zero  { 1 } else { 0 }) << 0
+        (if flag.interrupt { 1 } else { 0 }) << 2 |
+        (if flag.carry     { 1 } else { 0 }) << 1 |
+        (if flag.zero      { 1 } else { 0 }) << 0
     }
 }
 
 impl std::convert::From<u8> for Flag {
     fn from(byte: u8) -> Self {
-        let carry = ((byte >> 1) & 1) != 0;
-        let zero  = ((byte >> 0) & 1) != 0;
-        Flag { carry, zero }
+        let interrupt = ((byte >> 2) & 1) != 0;
+        let carry     = ((byte >> 1) & 1) != 0;
+        let zero      = ((byte >> 0) & 1) != 0;
+        Flag { interrupt, carry, zero }
     }
 }
 
@@ -47,8 +50,6 @@ pub struct Cpu {
     pub register: [u32; 32],
     pub flag: Flag,
     pub halted: bool,
-    pub interrupts_enabled: bool,
-    pub interrupts_paused: bool, // stores the previous state of interrupts_enabled while servicing an interrupt
 
     pub bus: Bus,
 }
@@ -59,10 +60,8 @@ impl Cpu {
             instruction_pointer: 0xF0000000,
             stack_pointer: 0x00000000,
             register: [0; 32],
-            flag: Flag { zero: false, carry: false },
+            flag: Flag { interrupt: false, carry: false, zero: false },
             halted: false,
-            interrupts_enabled: false,
-            interrupts_paused: false,
             bus,
         }
     }
@@ -209,9 +208,8 @@ impl Cpu {
         word
     }
     pub fn interrupt(&mut self, interrupt: Interrupt) {
-        if DEBUG { println!("interrupt(): enabled: {}, paused: {}", self.interrupts_enabled, self.interrupts_paused); }
-        if self.interrupts_enabled && !self.interrupts_paused {
-            self.interrupts_paused = true; // prevent interrupts while already servicing an interrupt
+        if DEBUG { println!("interrupt(): enabled: {}", self.flag.interrupt); }
+        if self.flag.interrupt {
             match interrupt {
                 Interrupt::Request(vector) => {
                     self.handle_interrupt(vector as u16);
@@ -237,6 +235,7 @@ impl Cpu {
         let address = self.bus.memory.read_32(address_of_pointer);
         self.push_stack_32(self.instruction_pointer);
         self.push_stack_8(u8::from(self.flag));
+        self.flag.interrupt = false; // prevent interrupts while already servicing an interrupt
         self.instruction_pointer = address;
     }
     fn handle_exception(&mut self, vector: u16, operand: Option<u32>) {
@@ -248,6 +247,7 @@ impl Cpu {
         if let Some(operand) = operand {
             self.push_stack_32(operand);
         }
+        self.flag.interrupt = false; // prevent interrupts while already servicing an interrupt
         self.instruction_pointer = address;
     }
     // execute instruction from memory at the current instruction pointer
@@ -2574,8 +2574,6 @@ impl Cpu {
                 let instruction_pointer_offset = 2; // increment past opcode half
                 let should_run = self.check_condition(condition);
                 if should_run {
-                    self.interrupts_enabled = self.interrupts_paused;
-                    self.interrupts_paused = false;
                     self.flag = Flag::from(self.pop_stack_8());
                     self.pop_stack_32()
                 } else {
@@ -2651,8 +2649,7 @@ impl Cpu {
                 let instruction_pointer_offset = 2; // increment past opcode half
                 let should_run = self.check_condition(condition);
                 if should_run {
-                    self.interrupts_enabled = true;
-                    self.interrupts_paused = false;
+                    self.flag.interrupt = true;
                 }
                 self.instruction_pointer + instruction_pointer_offset
             }
@@ -2660,8 +2657,7 @@ impl Cpu {
                 let instruction_pointer_offset = 2; // increment past opcode half
                 let should_run = self.check_condition(condition);
                 if should_run {
-                    self.interrupts_enabled = false;
-                    self.interrupts_paused = false;
+                    self.flag.interrupt = false;
                 }
                 self.instruction_pointer + instruction_pointer_offset
             }
