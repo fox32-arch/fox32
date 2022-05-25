@@ -1,6 +1,7 @@
 // main.rs
 
 pub mod memory;
+pub mod audio;
 pub mod bus;
 pub mod cpu;
 pub mod keyboard;
@@ -9,6 +10,7 @@ pub mod disk;
 pub mod runtime;
 pub mod wrapped;
 
+use audio::Audio;
 use bus::Bus;
 use cpu::{Cpu, Interrupt};
 use keyboard::Keyboard;
@@ -23,6 +25,7 @@ use std::mem;
 use std::ops::Deref;
 use std::sync::{Arc, mpsc, Mutex};
 use std::thread;
+use std::time;
 use std::process::exit;
 use std::env;
 use std::fs::{File, read};
@@ -30,6 +33,7 @@ use std::fs::{File, read};
 use image;
 use log::error;
 use pixels::{Pixels, SurfaceTexture};
+use rodio::{OutputStream, buffer::SamplesBuffer, Sink};
 use winit::dpi::LogicalSize;
 use winit::event::{ElementState, Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -86,8 +90,11 @@ fn main() {
     let keyboard = Arc::new(Mutex::new(Keyboard::new()));
     let mouse = Arc::new(Mutex::new(Mouse::new()));
 
+    let audio = Arc::new(Mutex::new(Audio::new()));
+
     let mut bus = Bus {
         memory: Box::new(MemoryStub()),
+        audio: audio.clone(),
         disk_controller: DiskController::new(),
         keyboard: keyboard.clone(),
         mouse: mouse.clone(),
@@ -130,6 +137,7 @@ fn main() {
 
     runtime.halted_set(false);
 
+    let memory_audio = memory.clone();
     let memory_cpu = memory.clone();
     let memory_eventloop = memory.clone();
 
@@ -191,6 +199,33 @@ fn main() {
                 }
             }
             println!("CPU halted");
+        }
+    }).unwrap();
+
+    let interrupt_sender_audio = interrupt_sender.clone();
+    let builder = thread::Builder::new().name("audio".to_string());
+    builder.spawn({
+        move || {
+            let (_stream, stream_handle) = OutputStream::try_default().unwrap();
+            let sink = Sink::try_new(&stream_handle).unwrap();
+            loop {
+                // every 500 ms, play what is in the audio buffer and tell fox32 to swap them
+                let mut audio_lock = audio.lock().unwrap();
+                if audio_lock.playing {
+                    let current_buffer: Vec<i16> = if audio_lock.current_buffer_is_0 {
+                        audio_lock.current_buffer_is_0 = false;
+                        memory_audio.ram()[0x0212C000..0x0212C000+32768].to_vec().chunks_exact(2).map(|x| ((x[1] as i16) << 8) | x[0] as i16).collect()
+                    } else {
+                        audio_lock.current_buffer_is_0 = true;
+                        memory_audio.ram()[0x0212C000+32768..0x0212C000+65536].to_vec().chunks_exact(2).map(|x| ((x[1] as i16) << 8) | x[0] as i16).collect()
+                    };
+                    let buffer = SamplesBuffer::new(1, 22050, current_buffer);
+                    sink.append(buffer);
+                    drop(audio_lock);
+                    interrupt_sender_audio.send(0xFE).unwrap(); // audio interrupt, swap audio buffers
+                    thread::sleep(time::Duration::from_millis(500));
+                }
+            }
         }
     }).unwrap();
 

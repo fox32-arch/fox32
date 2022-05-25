@@ -1,6 +1,6 @@
 // bus.rs
 
-use crate::{Memory, DiskController, Keyboard, Mouse, Overlay};
+use crate::{Memory, Audio, DiskController, Keyboard, Mouse, Overlay};
 
 use std::sync::{Arc, Mutex};
 use std::io::{Write, stdout};
@@ -9,6 +9,8 @@ pub struct Bus {
     pub memory: Box<dyn Memory>,
 
     pub disk_controller: DiskController,
+
+    pub audio: Arc<Mutex<Audio>>,
 
     pub keyboard: Arc<Mutex<Keyboard>>,
     pub mouse: Arc<Mutex<Mouse>>,
@@ -164,6 +166,11 @@ impl Bus {
                     }
                     _ => panic!("invalid mouse control port"),
                 }
+            }
+            0x80000600 => { // audio port
+                let mut audio_lock = self.audio.lock().unwrap();
+                audio_lock.playing = word != 0;
+                audio_lock.current_buffer_is_0 = true;
             }
             0x80001000..=0x80005003 => { // disk controller port
                 let id = port as u8;
