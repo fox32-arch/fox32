@@ -794,96 +794,6 @@ impl Cpu {
                 }
                 self.instruction_pointer + instruction_pointer_offset
             }
-            Instruction::Pow(size, condition, destination, source) => {
-                let (source_value, mut instruction_pointer_offset) = self.read_source(source);
-                let should_run = self.check_condition(condition);
-                match destination {
-                    Operand::Register => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
-                        match size {
-                            Size::Byte => {
-                                if should_run {
-                                    let result = (self.read_register(register) as u8).pow(source_value);
-                                    self.write_register(register, (self.read_register(register) & 0xFFFFFF00) | (result as u32));
-                                    self.flag.zero = result == 0;
-                                }
-                            }
-                            Size::Half => {
-                                if should_run {
-                                    let result = (self.read_register(register) as u16).pow(source_value);
-                                    self.write_register(register, (self.read_register(register) & 0xFFFF0000) | (result as u32));
-                                    self.flag.zero = result == 0;
-                                }
-                            }
-                            Size::Word => {
-                                if should_run {
-                                    let result = self.read_register(register).pow(source_value);
-                                    self.write_register(register, result);
-                                    self.flag.zero = result == 0;
-                                }
-                            }
-                        }
-                        instruction_pointer_offset += 1; // increment past 8 bit register number
-                    }
-                    Operand::RegisterPtr => {
-                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset);
-                        let pointer = self.read_register(register);
-                        match size {
-                            Size::Byte => {
-                                let result = self.bus.memory.read_8(pointer).pow(source_value);
-                                if should_run {
-                                    self.bus.memory.write_8(pointer, result);
-                                    self.flag.zero = result == 0;
-                                }
-                            }
-                            Size::Half => {
-                                let result = self.bus.memory.read_16(pointer).pow(source_value);
-                                if should_run {
-                                    self.bus.memory.write_16(pointer, result);
-                                    self.flag.zero = result == 0;
-                                }
-                            }
-                            Size::Word => {
-                                let result = self.bus.memory.read_32(pointer).pow(source_value);
-                                if should_run {
-                                    self.bus.memory.write_32(pointer, result);
-                                    self.flag.zero = result == 0;
-                                }
-                            }
-                        }
-                        instruction_pointer_offset += 1; // increment past 8 bit register number
-                    }
-                    Operand::ImmediatePtr(_) => {
-                        let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
-                        match size {
-                            Size::Byte => {
-                                let result = self.bus.memory.read_8(pointer).pow(source_value);
-                                if should_run {
-                                    self.bus.memory.write_8(pointer, result);
-                                    self.flag.zero = result == 0;
-                                }
-                            }
-                            Size::Half => {
-                                let result = self.bus.memory.read_16(pointer).pow(source_value);
-                                if should_run {
-                                    self.bus.memory.write_16(pointer, result);
-                                    self.flag.zero = result == 0;
-                                }
-                            }
-                            Size::Word => {
-                                let result = self.bus.memory.read_32(pointer).pow(source_value);
-                                if should_run {
-                                    self.bus.memory.write_32(pointer, result);
-                                    self.flag.zero = result == 0;
-                                }
-                            }
-                        }
-                        instruction_pointer_offset += 4; // increment past 32 bit pointer
-                    }
-                    _ => panic!("Attempting to use an immediate value as a destination"),
-                }
-                self.instruction_pointer + instruction_pointer_offset
-            }
             Instruction::Div(size, condition, destination, source) => {
                 let (source_value, mut instruction_pointer_offset) = self.read_source(source);
                 let should_run = self.check_condition(condition);
@@ -2707,7 +2617,6 @@ enum Instruction {
     Dec(Size, Condition, Operand),
 
     Mul(Size, Condition, Operand, Operand),
-    Pow(Size, Condition, Operand, Operand),
     Div(Size, Condition, Operand, Operand),
     Rem(Size, Condition, Operand, Operand),
 
@@ -2802,7 +2711,6 @@ impl Instruction {
             0x31 => Some(Instruction::Dec(size, condition, source)),
 
             0x02 => Some(Instruction::Mul(size, condition, destination, source)),
-            0x12 => Some(Instruction::Pow(size, condition, destination, source)),
             0x22 => Some(Instruction::Div(size, condition, destination, source)),
             0x32 => Some(Instruction::Rem(size, condition, destination, source)),
 
