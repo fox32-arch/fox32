@@ -84,6 +84,10 @@ impl Bus {
                 let mut keyboard_lock = self.keyboard.lock().expect("failed to lock the keyboard mutex");
                 keyboard_lock.pop() as u32
             }
+            0x80000600 => { // audio port
+                let audio_lock = self.audio.lock().unwrap();
+                audio_lock.playing as u32
+            }
             0x80001000..=0x80002003 => { // disk controller port
                 let id = port as u8;
                 let operation = (port & 0x0000F000) >> 8;
