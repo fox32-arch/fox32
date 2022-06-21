@@ -153,7 +153,7 @@ fn main() {
 
     let event_loop = EventLoop::new();
     let mut input = WinitInputHelper::new();
-    let icon = image::load_from_memory(include_bytes!("../../docs/logos/32.png")).unwrap();
+    let icon = image::load_from_memory(include_bytes!("32.png")).unwrap();
     let window = {
         let size = LogicalSize::new(WIDTH as f64, HEIGHT as f64);
         WindowBuilder::new()
