@@ -10,9 +10,11 @@
 
 **Note: This software is still very much in an early stage, and is currently more focused towards developers rather than end-users.**
 
-### Requirements
+### Building
 
-**fox32** requires Vulkan support to be installed.
+Clone this repository, `cd` into it, then clone the [fox32core](https://github.com/fox32-arch/fox32core) repository in a folder called `fox32core`.
+
+After that, just run `cargo build --release`. The resulting binary will be saved as `target/release/fox32`
 
 ### Usage
 
