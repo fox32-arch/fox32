@@ -22,7 +22,7 @@ After that, just run `cargo build --release`. The resulting binary will be saved
 
 Passing files as arguments will mount those files as disks, in the order that the arguments were passed.
 
-See [encoding.md](encoding.md) for information about the instruction set.
+See [encoding.md](docs/encoding.md) for information about the instruction set.
 
 ## License
 This project is licensed under the [MIT license](LICENSE).
