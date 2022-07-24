@@ -233,7 +233,7 @@ fn main() {
                 if input.state == ElementState::Released {
                     scancode |= 0x80; // "break" scancode
                 }
-                println!("scancode: {:x}", scancode);
+                //println!("scancode: {:x}", scancode);
                 keyboard_lock.push(scancode);
             }
         }
