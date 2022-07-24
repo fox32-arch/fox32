@@ -12,9 +12,7 @@
 
 ### Building
 
-Clone this repository, `cd` into it, then clone the [fox32core](https://github.com/fox32-arch/fox32core) repository in a folder called `fox32core`.
-
-After that, just run `cargo build --release`. The resulting binary will be saved as `target/release/fox32`
+Simply run `cargo build --release`. The resulting binary will be saved as `target/release/fox32`. You can also run `cargo run --release` if you want to run it directly.
 
 ### Usage
 

@@ -13,12 +13,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Check out fox32core
-        uses: actions/checkout@v2
-        with:
-          repository: fox32-arch/fox32core
-          path: ./fox32core
-
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:

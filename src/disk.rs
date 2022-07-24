@@ -20,10 +20,6 @@ impl Disk {
             current_sector: 0,
         }
     }
-
-    pub fn size(&self) -> u64 {
-        self.size
-    }
 }
 
 pub struct DiskController {
@@ -33,7 +29,7 @@ pub struct DiskController {
 
 impl DiskController {
     pub fn new() -> Self {
-        Self {
+        DiskController {
             disk: [None, None, None, None],
             buffer_pointer: 0x00000000
         }
@@ -60,24 +56,20 @@ impl DiskController {
         self.disk[disk_id as usize] = None;
     }
 
-    fn disk_mut(&mut self, disk_id: u8) -> &mut Disk {
-        self.disk[disk_id as usize].as_mut().expect("attempted to access unmounted disk")
+    pub fn get_size(&self, disk_id: u8) -> u64 {
+        self.disk[disk_id as usize].as_ref().expect("attempted to access unmounted disk").size
     }
-
-    pub fn get_size(&mut self, disk_id: u8) -> u64 {
-        self.disk_mut(disk_id).size
-    }
-    pub fn get_current_sector(&mut self, disk_id: u8) -> u32 {
-        self.disk_mut(disk_id).current_sector
+    pub fn get_current_sector(&self, disk_id: u8) -> u32 {
+        self.disk[disk_id as usize].as_ref().expect("attempted to access unmounted disk").current_sector
     }
     pub fn set_current_sector(&mut self, disk_id: u8, sector: u32) {
-        let disk = self.disk_mut(disk_id);
+        let mut disk = self.disk[disk_id as usize].as_mut().expect("attempted to access unmounted disk");
         disk.current_sector = sector;
         disk.file.seek(SeekFrom::Start(sector as u64 * 512)).expect("attempted to seek to sector beyond edge of disk");
     }
 
     pub fn read_into_memory(&mut self, disk_id: u8, ram: &mut MemoryRam) -> usize {
-        let disk = self.disk_mut(disk_id);
+        let disk = self.disk[disk_id as usize].as_mut().expect("attempted to access unmounted disk");
         let mut temp_buffer = [0u8; 512];
 
         let number_of_bytes_read = disk.file.read(&mut temp_buffer).unwrap();

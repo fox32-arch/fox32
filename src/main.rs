@@ -7,8 +7,6 @@ pub mod cpu;
 pub mod keyboard;
 pub mod mouse;
 pub mod disk;
-pub mod runtime;
-pub mod wrapped;
 
 use audio::Audio;
 use bus::Bus;
@@ -16,13 +14,8 @@ use cpu::{Cpu, Interrupt};
 use keyboard::Keyboard;
 use mouse::Mouse;
 use disk::DiskController;
-use memory::{MEMORY_RAM_START, MEMORY_ROM_START, MemoryRam, Memory, MemoryStub, MemoryBuffer};
-use runtime::Runtime;
-use wrapped::*;
+use memory::{MEMORY_RAM_START, MEMORY_ROM_START, MemoryRam, Memory};
 
-use std::io::Write;
-use std::mem;
-use std::ops::Deref;
 use std::sync::{Arc, mpsc, Mutex};
 use std::thread;
 use std::time;
@@ -92,8 +85,9 @@ fn main() {
 
     let audio = Arc::new(Mutex::new(Audio::new()));
 
+    let memory = Memory::new(read_rom().as_slice());
     let mut bus = Bus {
-        memory: Box::new(MemoryStub()),
+        memory: memory.clone(),
         audio: audio.clone(),
         disk_controller: DiskController::new(),
         keyboard: keyboard.clone(),
@@ -109,38 +103,6 @@ fn main() {
         }
     }
 
-    let (mut runtime, memory): (Box<dyn Runtime>, MemoryWrapped) = {
-        if env::var("FOX32_RUNTIME").unwrap_or_default() == "core" {
-
-            println!("Using \"fox32core\" runtime");
-
-            let bus_wrapped = BusWrapped::new(bus);
-            let state = fox32core::State::new(bus_wrapped.clone());
-            *state.debug() = env::var("FOX32_DEBUG").is_ok();
-            let state_wrapped = CoreWrapped::new(state);
-            let state_memory_wrapped = MemoryWrapped::new(CoreMemoryWrapped::new(state_wrapped.clone()));
-
-            mem::drop(mem::replace(&mut bus_wrapped.deref().borrow_mut().memory, Box::new(state_memory_wrapped.clone())));
-
-            (Box::new(state_wrapped.clone()), state_memory_wrapped.clone())
-
-        } else {
-
-            println!("Using \"rust\" runtime");
-
-            let memory = MemoryWrapped::new(MemoryBuffer::new());
-
-            mem::drop(mem::replace(&mut bus.memory, Box::new(memory.clone())));
-
-            (Box::new(Cpu::new(bus)), memory)
-
-        }
-    };
-
-    memory.rom().as_mut_slice().write(read_rom().as_slice()).expect("failed to write ROM");
-
-    runtime.halted_set(false);
-
     let memory_audio = memory.clone();
     let memory_cpu = memory.clone();
     let memory_eventloop = memory.clone();
@@ -154,6 +116,8 @@ fn main() {
     let rom_bottom_address = MEMORY_ROM_START;
     let rom_top_address = rom_bottom_address + rom_size - 1;
     println!("ROM: {:.2} KiB mapped at {:#010X}-{:#010X}", rom_size / 1024, rom_bottom_address, rom_top_address);
+
+    let mut cpu = Cpu::new(bus);
 
     let event_loop = EventLoop::new();
     let mut input = WinitInputHelper::new();
@@ -177,26 +141,26 @@ fn main() {
         Pixels::new(WIDTH as u32, HEIGHT as u32, surface_texture).unwrap()
     };
 
-    let (interrupt_sender, interrupt_receiver) = mpsc::channel::<u16>();
+    let (interrupt_sender, interrupt_receiver) = mpsc::channel::<Interrupt>();
 
     let builder = thread::Builder::new().name("cpu".to_string());
     builder.spawn({
         move || {
             loop {
-                while !runtime.halted_get() {
+                while !cpu.halted {
                     if let Ok(interrupt) = interrupt_receiver.try_recv() {
-                        runtime.raise(interrupt);
+                        cpu.interrupt(interrupt);
                     }
-                    runtime.step();
+                    cpu.execute_memory_instruction();
                 }
-                if !runtime.flag_interrupt_get() {
+                if !cpu.flag.interrupt {
                     // the cpu was halted and interrupts are disabled
                     // at this point, the cpu is dead and cannot resume, break out of the loop
                     break;
                 }
                 if let Ok(interrupt) = interrupt_receiver.recv() {
-                    runtime.halted_set(false);
-                    runtime.raise(interrupt);
+                    cpu.halted = false;
+                    cpu.interrupt(interrupt);
                 } else {
                     // sender is closed, break
                     break;
@@ -226,7 +190,7 @@ fn main() {
                     let buffer = SamplesBuffer::new(1, 22050, current_buffer);
                     sink.append(buffer);
                     drop(audio_lock);
-                    interrupt_sender_audio.send(0xFE).unwrap(); // audio interrupt, swap audio buffers
+                    interrupt_sender_audio.send(Interrupt::Request(0xFE)).unwrap(); // audio interrupt, swap audio buffers
                     thread::sleep(time::Duration::from_millis(500));
                 }
             }
@@ -240,7 +204,7 @@ fn main() {
         if let Event::MainEventsCleared = event {
             // update internal state and request a redraw
 
-            match interrupt_sender.send(0xFF) { // vsync interrupt
+            match interrupt_sender.send(Interrupt::Request(0xFF)) { // vsync interrupt
                 Ok(_) => {},
                 Err(_) => {
                     *control_flow = ControlFlow::Exit;

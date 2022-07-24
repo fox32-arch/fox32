@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use std::io::{Write, stdout};
 
 pub struct Bus {
-    pub memory: Box<dyn Memory>,
+    pub memory: Memory,
 
     pub disk_controller: DiskController,
 
@@ -99,7 +99,7 @@ impl Bus {
                             panic!("invalid disk ID");
                         }
                         match &self.disk_controller.disk[id as usize] {
-                            Some(disk) => disk.size() as u32, // return size if this disk is inserted
+                            Some(_) => self.disk_controller.get_size(id) as u32, // return size if this disk is inserted
                             None => 0, // return 0 if this disk is not inserted
                         }
                     }
@@ -224,16 +224,5 @@ impl Bus {
             }
             _ => return,
         }
-    }
-}
-
-impl fox32core::Bus for Bus {
-    fn io_read(&mut self, port: u32) -> Option<u32> {
-        Some(self.read_io(port))
-    }
-
-    fn io_write(&mut self, port: u32, value: u32) -> Option<()> {
-        self.write_io(port, value);
-        Some(())
     }
 }
