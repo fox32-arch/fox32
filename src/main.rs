@@ -36,6 +36,8 @@ use winit_input_helper::WinitInputHelper;
 const WIDTH: usize = 640;
 const HEIGHT: usize = 480;
 
+const FRAMEBUFFER_ADDRESS: usize = 0x02000000;
+
 pub struct Display {
     background: Vec<u8>,
     overlays: Arc<Mutex<Vec<Overlay>>>,
@@ -283,7 +285,7 @@ impl Display {
         let overlay_lock = self.overlays.lock().unwrap();
 
         for i in 0..(HEIGHT*WIDTH*4) as usize {
-            self.background[i] = ram[0x02000000 + i];
+            self.background[i] = ram[FRAMEBUFFER_ADDRESS + i];
         }
 
         for index in 0..=31 {
