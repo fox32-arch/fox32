@@ -37,6 +37,9 @@ const WIDTH: usize = 640;
 const HEIGHT: usize = 480;
 
 const FRAMEBUFFER_ADDRESS: usize = 0x02000000;
+const AUDIO_BUFFER_0_ADDRESS: usize = 0x0212C000;
+const AUDIO_BUFFER_1_ADDRESS: usize = 0x02134000;
+const AUDIO_BUFFER_SIZE: usize = 0x8000;
 
 pub struct Display {
     background: Vec<u8>,
@@ -184,10 +187,10 @@ fn main() {
                 if audio_lock.playing {
                     let current_buffer: Vec<i16> = if audio_lock.current_buffer_is_0 {
                         audio_lock.current_buffer_is_0 = false;
-                        memory_audio.ram()[0x0212C000..0x0212C000+32768].to_vec().chunks_exact(2).map(|x| ((x[1] as i16) << 8) | x[0] as i16).collect()
+                        memory_audio.ram()[AUDIO_BUFFER_0_ADDRESS..AUDIO_BUFFER_0_ADDRESS+AUDIO_BUFFER_SIZE].to_vec().chunks_exact(2).map(|x| ((x[1] as i16) << 8) | x[0] as i16).collect()
                     } else {
                         audio_lock.current_buffer_is_0 = true;
-                        memory_audio.ram()[0x0212C000+32768..0x0212C000+65536].to_vec().chunks_exact(2).map(|x| ((x[1] as i16) << 8) | x[0] as i16).collect()
+                        memory_audio.ram()[AUDIO_BUFFER_1_ADDRESS..AUDIO_BUFFER_1_ADDRESS+AUDIO_BUFFER_SIZE].to_vec().chunks_exact(2).map(|x| ((x[1] as i16) << 8) | x[0] as i16).collect()
                     };
                     let buffer = SamplesBuffer::new(1, 22050, current_buffer);
                     sink.append(buffer);
