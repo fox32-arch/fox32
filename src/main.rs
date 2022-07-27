@@ -147,6 +147,7 @@ fn main() {
     };
 
     let (interrupt_sender, interrupt_receiver) = mpsc::channel::<Interrupt>();
+    let (exit_sender, exit_receiver) = mpsc::channel::<bool>();
 
     let builder = thread::Builder::new().name("cpu".to_string());
     builder.spawn({
@@ -157,6 +158,14 @@ fn main() {
                         cpu.interrupt(interrupt);
                     }
                     cpu.execute_memory_instruction();
+                    if let Ok(_) = exit_receiver.try_recv() {
+                        // the rest of the VM has exited, stop the CPU thread
+                        break;
+                    }
+                }
+                if let Ok(_) = exit_receiver.try_recv() {
+                    // the rest of the VM has exited, stop the CPU thread
+                    break;
                 }
                 if !cpu.flag.interrupt {
                     // the cpu was halted and interrupts are disabled
@@ -246,6 +255,7 @@ fn main() {
         if input.update(&event) {
             // close events
             if input.quit() {
+                exit_sender.send(true).unwrap();
                 *control_flow = ControlFlow::Exit;
                 return;
             }
