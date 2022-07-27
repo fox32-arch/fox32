@@ -174,7 +174,7 @@ impl Bus {
             0x80000600 => { // audio port
                 let mut audio_lock = self.audio.lock().unwrap();
                 audio_lock.playing = word != 0;
-                audio_lock.current_buffer_is_0 = true;
+                audio_lock.current_buffer_is_0 = false; // the first buffer refill interrupt will invert this to true
             }
             0x80001000..=0x80005003 => { // disk controller port
                 let id = port as u8;
