@@ -191,7 +191,7 @@ fn main() {
             let (_stream, stream_handle) = OutputStream::try_default().unwrap();
             let sink = Sink::try_new(&stream_handle).unwrap();
             loop {
-                // every 500 ms, play what is in the audio buffer and tell fox32 to swap them
+                // every `sleep` number of ms, play what is in the audio buffer and tell fox32 to swap them
                 let mut audio_lock = audio.lock().unwrap();
                 if audio_lock.playing {
                     let current_buffer: Vec<i16> = if audio_lock.current_buffer_is_0 {
@@ -201,11 +201,13 @@ fn main() {
                         audio_lock.current_buffer_is_0 = true;
                         memory_audio.ram()[AUDIO_BUFFER_1_ADDRESS..AUDIO_BUFFER_1_ADDRESS+AUDIO_BUFFER_SIZE].to_vec().chunks_exact(2).map(|x| ((x[1] as i16) << 8) | x[0] as i16).collect()
                     };
-                    let buffer = SamplesBuffer::new(1, 22050, current_buffer);
+                    let buffer = SamplesBuffer::new(1, audio_lock.sample_rate, current_buffer);
+                    // 1 Hz = 1000 ms
+                    let sleep: f32 = (1000 as f32 / audio_lock.sample_rate as f32) * (AUDIO_BUFFER_SIZE as f32 / 2.0);
                     sink.append(buffer);
                     drop(audio_lock);
                     interrupt_sender_audio.send(Interrupt::Request(0xFE)).unwrap(); // audio interrupt, swap audio buffers
-                    thread::sleep(time::Duration::from_millis(500));
+                    thread::sleep(time::Duration::from_millis(sleep as u64));
                 }
             }
         }
