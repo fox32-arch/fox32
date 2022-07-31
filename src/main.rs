@@ -58,9 +58,9 @@ pub struct Overlay {
 
 fn read_rom() -> Vec<u8> {
     read("fox32.rom").unwrap_or_else(|_| {
-        println!("fox32.rom not found, attempting to open ../fox32rom/fox32.rom instead");
         read("../fox32rom/fox32.rom").unwrap_or_else(|_| {
-            error("fox32.rom not found!");
+            println!("fox32.rom file not found, using embedded ROM");
+            include_bytes!("../fox32.rom/fox32.rom").to_vec()
         })
     })
 }
@@ -79,10 +79,6 @@ fn main() {
     println!("{}", version_string);
 
     let args: Vec<String> = env::args().collect();
-    /*if args.len() != 2 {
-        println!("fox32\nUsage: {} <binary>", &args[0]);
-        exit(1);
-    }*/
 
     let mut display = Display::new();
     let keyboard = Arc::new(Mutex::new(Keyboard::new()));

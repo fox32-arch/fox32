@@ -13,6 +13,13 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: Download latest fox32rom artifact
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          repo: fox32-arch/fox32rom
+          workflow: fox32rom-unstable.yml
+          workflow_conclusion: success
+
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
