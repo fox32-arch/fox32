@@ -1,6 +1,6 @@
 // bus.rs
 
-use crate::{Memory, Audio, DiskController, Keyboard, Mouse, Overlay};
+use crate::{Memory, AudioChannel, DiskController, Keyboard, Mouse, Overlay};
 
 use std::sync::{Arc, Mutex};
 use std::io::{Write, stdout};
@@ -10,7 +10,10 @@ pub struct Bus {
 
     pub disk_controller: DiskController,
 
-    pub audio: Arc<Mutex<Audio>>,
+    pub audio_channel_0: Arc<Mutex<AudioChannel>>,
+    pub audio_channel_1: Arc<Mutex<AudioChannel>>,
+    pub audio_channel_2: Arc<Mutex<AudioChannel>>,
+    pub audio_channel_3: Arc<Mutex<AudioChannel>>,
 
     pub keyboard: Arc<Mutex<Keyboard>>,
     pub mouse: Arc<Mutex<Mouse>>,
@@ -84,9 +87,27 @@ impl Bus {
                 let mut keyboard_lock = self.keyboard.lock().expect("failed to lock the keyboard mutex");
                 keyboard_lock.pop() as u32
             }
-            0x80000600 => { // audio port
-                let audio_lock = self.audio.lock().unwrap();
-                audio_lock.playing as u32
+            0x80000600..=0x80000603 => { // audio port
+                let channel = (port & 0x000000FF) as u8;
+                match channel {
+                    0 => {
+                        let audio_lock = self.audio_channel_0.lock().unwrap();
+                        audio_lock.sample_rate
+                    },
+                    1 => {
+                        let audio_lock = self.audio_channel_1.lock().unwrap();
+                        audio_lock.sample_rate
+                    },
+                    2 => {
+                        let audio_lock = self.audio_channel_2.lock().unwrap();
+                        audio_lock.sample_rate
+                    },
+                    3 => {
+                        let audio_lock = self.audio_channel_3.lock().unwrap();
+                        audio_lock.sample_rate
+                    },
+                    _ => panic!("invalid audio channel"),
+                }
             }
             0x80001000..=0x80002003 => { // disk controller port
                 let id = port as u8;
@@ -171,11 +192,31 @@ impl Bus {
                     _ => panic!("invalid mouse control port"),
                 }
             }
-            0x80000600 => { // audio port
-                let mut audio_lock = self.audio.lock().unwrap();
-                audio_lock.playing = word != 0;
-                audio_lock.sample_rate = word;
-                audio_lock.current_buffer_is_0 = false; // the first buffer refill interrupt will invert this to true
+            0x80000600..=0x80000603 => { // audio port
+                let channel = (port & 0x000000FF) as u8;
+                match channel {
+                    0 => {
+                        let mut audio_lock = self.audio_channel_0.lock().unwrap();
+                        audio_lock.playing = word != 0;
+                        audio_lock.sample_rate = word;
+                    },
+                    1 => {
+                        let mut audio_lock = self.audio_channel_1.lock().unwrap();
+                        audio_lock.playing = word != 0;
+                        audio_lock.sample_rate = word;
+                    },
+                    2 => {
+                        let mut audio_lock = self.audio_channel_2.lock().unwrap();
+                        audio_lock.playing = word != 0;
+                        audio_lock.sample_rate = word;
+                    },
+                    3 => {
+                        let mut audio_lock = self.audio_channel_3.lock().unwrap();
+                        audio_lock.playing = word != 0;
+                        audio_lock.sample_rate = word;
+                    },
+                    _ => panic!("invalid audio channel"),
+                };
             }
             0x80001000..=0x80005003 => { // disk controller port
                 let id = port as u8;

@@ -8,7 +8,7 @@ pub mod keyboard;
 pub mod mouse;
 pub mod disk;
 
-use audio::Audio;
+use audio::AudioChannel;
 use bus::Bus;
 use cpu::{Cpu, Interrupt};
 use keyboard::Keyboard;
@@ -18,7 +18,6 @@ use memory::{MEMORY_RAM_START, MEMORY_ROM_START, MemoryRam, Memory};
 
 use std::sync::{Arc, mpsc, Mutex};
 use std::thread;
-use std::time;
 use std::process::exit;
 use std::env;
 use std::fs::{File, read};
@@ -26,7 +25,6 @@ use std::fs::{File, read};
 use image;
 use log::error;
 use pixels::{Pixels, SurfaceTexture};
-use rodio::{OutputStream, buffer::SamplesBuffer, Sink};
 use winit::dpi::LogicalSize;
 use winit::event::{ElementState, Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -37,9 +35,6 @@ const WIDTH: usize = 640;
 const HEIGHT: usize = 480;
 
 const FRAMEBUFFER_ADDRESS: usize = 0x02000000;
-const AUDIO_BUFFER_0_ADDRESS: usize = 0x0212C000;
-const AUDIO_BUFFER_1_ADDRESS: usize = 0x02134000;
-const AUDIO_BUFFER_SIZE: usize = 0x8000;
 
 pub struct Display {
     background: Vec<u8>,
@@ -84,12 +79,18 @@ fn main() {
     let keyboard = Arc::new(Mutex::new(Keyboard::new()));
     let mouse = Arc::new(Mutex::new(Mouse::new()));
 
-    let audio = Arc::new(Mutex::new(Audio::new()));
+    let audio_channel_0 = Arc::new(Mutex::new(AudioChannel::new(0)));
+    let audio_channel_1 = Arc::new(Mutex::new(AudioChannel::new(1)));
+    let audio_channel_2 = Arc::new(Mutex::new(AudioChannel::new(2)));
+    let audio_channel_3 = Arc::new(Mutex::new(AudioChannel::new(3)));
 
     let memory = Memory::new(read_rom().as_slice());
     let mut bus = Bus {
         memory: memory.clone(),
-        audio: audio.clone(),
+        audio_channel_0: audio_channel_0.clone(),
+        audio_channel_1: audio_channel_1.clone(),
+        audio_channel_2: audio_channel_2.clone(),
+        audio_channel_3: audio_channel_3.clone(),
         disk_controller: DiskController::new(),
         keyboard: keyboard.clone(),
         mouse: mouse.clone(),
@@ -104,7 +105,6 @@ fn main() {
         }
     }
 
-    let memory_audio = memory.clone();
     let memory_cpu = memory.clone();
     let memory_eventloop = memory.clone();
 
@@ -145,6 +145,11 @@ fn main() {
     let (interrupt_sender, interrupt_receiver) = mpsc::channel::<Interrupt>();
     let (exit_sender, exit_receiver) = mpsc::channel::<bool>();
 
+    AudioChannel::spawn_thread(audio_channel_0, interrupt_sender.clone(), memory.clone());
+    AudioChannel::spawn_thread(audio_channel_1, interrupt_sender.clone(), memory.clone());
+    AudioChannel::spawn_thread(audio_channel_2, interrupt_sender.clone(), memory.clone());
+    AudioChannel::spawn_thread(audio_channel_3, interrupt_sender.clone(), memory.clone());
+
     let builder = thread::Builder::new().name("cpu".to_string());
     builder.spawn({
         move || {
@@ -177,35 +182,6 @@ fn main() {
                 }
             }
             println!("CPU halted");
-        }
-    }).unwrap();
-
-    let interrupt_sender_audio = interrupt_sender.clone();
-    let builder = thread::Builder::new().name("audio".to_string());
-    builder.spawn({
-        move || {
-            let (_stream, stream_handle) = OutputStream::try_default().unwrap();
-            let sink = Sink::try_new(&stream_handle).unwrap();
-            loop {
-                // every `sleep` number of ms, play what is in the audio buffer and tell fox32 to swap them
-                let mut audio_lock = audio.lock().unwrap();
-                if audio_lock.playing {
-                    let current_buffer: Vec<i16> = if audio_lock.current_buffer_is_0 {
-                        audio_lock.current_buffer_is_0 = false;
-                        memory_audio.ram()[AUDIO_BUFFER_0_ADDRESS..AUDIO_BUFFER_0_ADDRESS+AUDIO_BUFFER_SIZE].to_vec().chunks_exact(2).map(|x| ((x[1] as i16) << 8) | x[0] as i16).collect()
-                    } else {
-                        audio_lock.current_buffer_is_0 = true;
-                        memory_audio.ram()[AUDIO_BUFFER_1_ADDRESS..AUDIO_BUFFER_1_ADDRESS+AUDIO_BUFFER_SIZE].to_vec().chunks_exact(2).map(|x| ((x[1] as i16) << 8) | x[0] as i16).collect()
-                    };
-                    let buffer = SamplesBuffer::new(1, audio_lock.sample_rate, current_buffer);
-                    // 1 Hz = 1000 ms
-                    let sleep: f32 = (1000 as f32 / audio_lock.sample_rate as f32) * (AUDIO_BUFFER_SIZE as f32 / 2.0);
-                    sink.append(buffer);
-                    drop(audio_lock);
-                    interrupt_sender_audio.send(Interrupt::Request(0xFE)).unwrap(); // audio interrupt, swap audio buffers
-                    thread::sleep(time::Duration::from_millis(sleep as u64));
-                }
-            }
         }
     }).unwrap();
 
