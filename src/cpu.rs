@@ -2571,6 +2571,17 @@ impl Cpu {
                 }
                 self.instruction_pointer + instruction_pointer_offset
             }
+            Instruction::Int(condition, source) => {
+                let (source_value, instruction_pointer_offset) = self.read_source(source);
+                let should_run = self.check_condition(condition);
+                if should_run {
+                    self.instruction_pointer += instruction_pointer_offset;
+                    self.handle_interrupt(source_value as u16);
+                    self.instruction_pointer
+                } else {
+                    self.instruction_pointer + instruction_pointer_offset
+                } 
+            }
         }
     }
 }
@@ -2660,6 +2671,7 @@ enum Instruction {
 
     Ise(Condition),
     Icl(Condition),
+    Int(Condition, Operand),
 }
 
 impl Instruction {
@@ -2754,6 +2766,7 @@ impl Instruction {
 
             0x0C => Some(Instruction::Ise(condition)),
             0x1C => Some(Instruction::Icl(condition)),
+            0x2C => Some(Instruction::Int(condition, source)),
 
             _ => None,
         }
