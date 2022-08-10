@@ -38,7 +38,6 @@ impl DiskController {
     pub fn select_file(&self) -> Option<File> {
         let path = FileDialog::new()
             .add_filter("Disk Image", &["img", "dsk"])
-            .add_filter("f32 Binary", &["f32"])
             .add_filter("Raw Binary", &["bin"])
             .add_filter("All Files", &["*"])
             .set_title(&format!("Select a file to insert"))
