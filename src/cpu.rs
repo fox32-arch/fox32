@@ -35,6 +35,7 @@ impl std::convert::From<u8> for Flag {
 pub enum Exception {
     DivideByZero,
     InvalidOpcode(u32),
+    PageFault(u32),
 }
 
 #[derive(Debug)]
@@ -159,52 +160,34 @@ impl Cpu {
     pub fn push_stack_8(&mut self, byte: u8) {
         let decremented_stack_pointer = self.stack_pointer.overflowing_sub(1);
         self.stack_pointer = decremented_stack_pointer.0;
-        if decremented_stack_pointer.1 {
-            // TODO: stack overflow exception
-        }
         self.bus.memory.write_8(self.stack_pointer, byte);
     }
     pub fn pop_stack_8(&mut self) -> u8 {
         let byte = self.bus.memory.read_8(self.stack_pointer);
         let incremented_stack_pointer = self.stack_pointer.overflowing_add(1);
         self.stack_pointer = incremented_stack_pointer.0;
-        if incremented_stack_pointer.1 {
-            // TODO: stack overflow exception
-        }
         byte
     }
     pub fn push_stack_16(&mut self, half: u16) {
         let decremented_stack_pointer = self.stack_pointer.overflowing_sub(2);
         self.stack_pointer = decremented_stack_pointer.0;
-        if decremented_stack_pointer.1 {
-            // TODO: stack overflow exception
-        }
         self.bus.memory.write_16(self.stack_pointer, half);
     }
     pub fn pop_stack_16(&mut self) -> u16 {
         let half = self.bus.memory.read_16(self.stack_pointer);
         let incremented_stack_pointer = self.stack_pointer.overflowing_add(2);
         self.stack_pointer = incremented_stack_pointer.0;
-        if incremented_stack_pointer.1 {
-            // TODO: stack overflow exception
-        }
         half
     }
     pub fn push_stack_32(&mut self, word: u32) {
         let decremented_stack_pointer = self.stack_pointer.overflowing_sub(4);
         self.stack_pointer = decremented_stack_pointer.0;
-        if decremented_stack_pointer.1 {
-            // TODO: stack overflow exception
-        }
         self.bus.memory.write_32(self.stack_pointer, word);
     }
     pub fn pop_stack_32(&mut self) -> u32 {
         let word = self.bus.memory.read_32(self.stack_pointer);
         let incremented_stack_pointer = self.stack_pointer.overflowing_add(4);
         self.stack_pointer = incremented_stack_pointer.0;
-        if incremented_stack_pointer.1 {
-            // TODO: stack overflow exception
-        }
         word
     }
     pub fn interrupt(&mut self, interrupt: Interrupt) {
@@ -223,6 +206,10 @@ impl Cpu {
                         Exception::InvalidOpcode(opcode) => {
                             let vector: u16 = 1;
                             self.handle_exception(vector, Some(opcode));
+                        }
+                        Exception::PageFault(virtual_address) => {
+                            let vector: u16 = 2;
+                            self.handle_exception(vector, Some(virtual_address));
                         }
                     }
                 }
@@ -2580,7 +2567,32 @@ impl Cpu {
                     self.instruction_pointer
                 } else {
                     self.instruction_pointer + instruction_pointer_offset
-                } 
+                }
+            }
+
+            Instruction::Mse(condition) => {
+                let instruction_pointer_offset = 2; // increment past opcode half
+                let should_run = self.check_condition(condition);
+                if should_run {
+                    *self.bus.memory.mmu_enabled() = true;
+                }
+                self.instruction_pointer + instruction_pointer_offset
+            }
+            Instruction::Mcl(condition) => {
+                let instruction_pointer_offset = 2; // increment past opcode half
+                let should_run = self.check_condition(condition);
+                if should_run {
+                    *self.bus.memory.mmu_enabled() = false;
+                }
+                self.instruction_pointer + instruction_pointer_offset
+            }
+            Instruction::Tlb(condition, source) => {
+                let (source_value, instruction_pointer_offset) = self.read_source(source);
+                let should_run = self.check_condition(condition);
+                if should_run {
+                    self.bus.memory.flush_tlb(Some(source_value));
+                }
+                self.instruction_pointer + instruction_pointer_offset
             }
         }
     }
@@ -2672,6 +2684,10 @@ enum Instruction {
     Ise(Condition),
     Icl(Condition),
     Int(Condition, Operand),
+
+    Mse(Condition),
+    Mcl(Condition),
+    Tlb(Condition, Operand),
 }
 
 impl Instruction {
@@ -2767,6 +2783,10 @@ impl Instruction {
             0x0C => Some(Instruction::Ise(condition)),
             0x1C => Some(Instruction::Icl(condition)),
             0x2C => Some(Instruction::Int(condition, source)),
+
+            0x0D => Some(Instruction::Mse(condition)),
+            0x1D => Some(Instruction::Mcl(condition)),
+            0x2D => Some(Instruction::Tlb(condition, source)),
 
             _ => None,
         }

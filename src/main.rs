@@ -10,7 +10,7 @@ pub mod disk;
 
 use audio::AudioChannel;
 use bus::Bus;
-use cpu::{Cpu, Interrupt};
+use cpu::{Cpu, Exception, Interrupt};
 use keyboard::Keyboard;
 use mouse::Mouse;
 use disk::DiskController;
@@ -84,7 +84,9 @@ fn main() {
     let audio_channel_2 = Arc::new(Mutex::new(AudioChannel::new(2)));
     let audio_channel_3 = Arc::new(Mutex::new(AudioChannel::new(3)));
 
-    let memory = Memory::new(read_rom().as_slice());
+    let (exception_sender, exception_receiver) = mpsc::channel::<Exception>();
+
+    let memory = Memory::new(read_rom().as_slice(), exception_sender);
     let mut bus = Bus {
         memory: memory.clone(),
         audio_channel_0: audio_channel_0.clone(),
@@ -155,6 +157,9 @@ fn main() {
         move || {
             loop {
                 while !cpu.halted {
+                    if let Ok(exception) = exception_receiver.try_recv() {
+                        cpu.interrupt(Interrupt::Exception(exception));
+                    }
                     if let Ok(interrupt) = interrupt_receiver.try_recv() {
                         cpu.interrupt(interrupt);
                     }
