@@ -1,6 +1,6 @@
 [package]
 name = "fox32"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["ry"]
 edition = "2021"
 build = "build.rs"

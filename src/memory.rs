@@ -1,5 +1,7 @@
 // memory.rs
 
+const DEBUG: bool = false;
+
 use crate::error;
 use crate::cpu::Exception;
 
@@ -115,17 +117,18 @@ impl Memory {
                     let table_rw = table & 0b10 != 0;
                     let table_address = table & 0xFFFFF000;
 
-                    let tlb_entry = MemoryPage {
-                        //physical_address: (((directory_index + 1) * (table_index + 1) * 4096) - 4096),
-                        physical_address: (directory_index << 22) | (table_index << 12),
-                        present: table_present,
-                        rw: table_rw,
-                    };
-                    self.tlb().entry(table_address).or_insert(tlb_entry);
+                    if table_present {
+                        let tlb_entry = MemoryPage {
+                            physical_address: table_address,
+                            present: table_present,
+                            rw: table_rw,
+                        };
+                        self.tlb().entry((directory_index << 22) | (table_index << 12)).or_insert(tlb_entry);
+                    }
                 }
             }
         }
-        println!("{:#X?}", self.tlb());
+        if DEBUG { println!("{:#X?}", self.tlb()); }
     }
 
     pub fn virtual_to_physical(&self, virtual_address: u32) -> Option<(u32, bool)> {
