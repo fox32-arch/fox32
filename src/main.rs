@@ -55,7 +55,7 @@ fn read_rom() -> Vec<u8> {
     read("fox32.rom").unwrap_or_else(|_| {
         read("../fox32rom/fox32.rom").unwrap_or_else(|_| {
             println!("fox32.rom file not found, using embedded ROM");
-            include_bytes!("../fox32.rom/fox32.rom").to_vec()
+            include_bytes!("fox32.rom").to_vec()
         })
     })
 }

@@ -20,6 +20,10 @@ jobs:
           workflow: fox32rom-unstable.yml
           workflow_conclusion: success
 
+      - name: Move fox32.rom into the src folder
+        run: cp fox32.rom/fox32.rom src/fox32.rom
+        shell: powershell
+
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
