@@ -70,7 +70,7 @@ pub fn warn(message: &str) {
 }
 
 fn main() {
-    let version_string = format!("fox32 {} ({})", env!("VERGEN_BUILD_SEMVER"), env!("VERGEN_GIT_SHA_SHORT"));
+    let version_string = format!("fox32 {} ({})", env!("VERGEN_BUILD_SEMVER"), option_env!("VERGEN_GIT_SHA_SHORT").unwrap_or("unknown"));
     println!("{}", version_string);
 
     let args: Vec<String> = env::args().collect();

@@ -17,4 +17,4 @@ winit_input_helper = "0.11"
 
 [build-dependencies]
 anyhow = "1.0"
-vergen = { version = "6", default-features = false, features = ["build", "git"] }
+vergen = { version = "7", default-features = false, features = ["build", "git"] }
