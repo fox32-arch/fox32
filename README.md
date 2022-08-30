@@ -16,7 +16,7 @@ Prebuilt binaries of the latest commit are also available on the [GitHub Actions
 
 ### Building
 
-Download the latest release of [**fox32rom**](https://github.com/fox32-arch/fox32rom/releases). Create a folder in the root of this repo called `fox32.rom`, and place the downloaded `fox32.rom` file into that directory. Then simply run `cargo build --release`. The resulting binary will be saved as `target/release/fox32`. You can also run `cargo run --release` if you want to run it directly.
+Download the latest release of [**fox32rom**](https://github.com/fox32-arch/fox32rom/releases), and place the downloaded `fox32.rom` file into the `src` directory. Then simply run `cargo build --release`. The resulting binary will be saved as `target/release/fox32`. You can also run `cargo run --release` if you want to run it directly.
 
 ### Usage
 
