@@ -2,6 +2,7 @@
 
 use crate::{Memory, AudioChannel, DiskController, Keyboard, Mouse, Overlay};
 
+use chrono::prelude::*;
 use std::sync::{Arc, Mutex};
 use std::io::{Write, stdout};
 
@@ -19,6 +20,8 @@ pub struct Bus {
     pub mouse: Arc<Mutex<Mouse>>,
 
     pub overlays: Arc<Mutex<Vec<Overlay>>>,
+
+    pub startup_time: i64,
 }
 
 impl Bus {
@@ -107,6 +110,33 @@ impl Bus {
                         audio_lock.sample_rate
                     },
                     _ => panic!("invalid audio channel"),
+                }
+            }
+            0x80000700..=0x80000706 => { // RTC port
+                let setting = (port & 0x000000FF) as u8;
+                match setting {
+                    0 => { // year
+                        Local::now().year() as u32
+                    },
+                    1 => { // month
+                        Local::now().month()
+                    },
+                    2 => { // day
+                        Local::now().day()
+                    },
+                    3 => { // hour
+                        Local::now().hour()
+                    },
+                    4 => { // minute
+                        Local::now().minute()
+                    },
+                    5 => { // second
+                        Local::now().second()
+                    },
+                    6 => { // milliseconds elapsed since startup
+                        (Local::now().timestamp_millis() - self.startup_time) as u32
+                    },
+                    _ => panic!("invalid RTC port"),
                 }
             }
             0x80001000..=0x80002003 => { // disk controller port

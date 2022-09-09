@@ -22,6 +22,7 @@ use std::process::exit;
 use std::env;
 use std::fs::{File, read};
 
+use chrono::prelude::*;
 use image;
 use log::error;
 use pixels::{Pixels, SurfaceTexture};
@@ -97,6 +98,7 @@ fn main() {
         keyboard: keyboard.clone(),
         mouse: mouse.clone(),
         overlays: display.overlays.clone(),
+        startup_time: Local::now().timestamp_millis(),
     };
 
     if args.len() > 1 {
