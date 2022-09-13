@@ -19,7 +19,7 @@ If the instruction doesn't allow variable sizes or a size was not specified, set
 | 0-  | NOP  | ADD[.8,16,32] | MUL[.8,16,32] | AND[.8,16,32] | SLA[.8,16,32] | SRA[.8,16,32] | BSE[.8,16,32] | CMP[.8,16,32]  | JMP  | RJMP  | PUSH[.8,16,32] | IN  | ISE | MSE |     |     |
 | 1-  | HALT | INC[.8,16,32] |               | OR[.8,16,32]  |               | SRL[.8,16,32] | BCL[.8,16,32] | MOV[.8,16,32]  | CALL | RCALL | POP[.8,16,32]  | OUT | ICL | MCL |     |     |
 | 2-  | BRK  | SUB[.8,16,32] | DIV[.8,16,32] | XOR[.8,16,32] | ROL[.8,16,32] | ROR[.8,16,32] | BTS[.8,16,32] | MOVZ[.8,16,32] | LOOP | RLOOP | RET            |     | INT | TLB |     |     |
-| 3-  |      | DEC[.8,16,32] | REM[.8,16,32] | NOT[.8,16,32] |               |               |               |                |      | RTA   | RETI           |     |     |     |     |     |
+| 3-  |      | DEC[.8,16,32] | REM[.8,16,32] | NOT[.8,16,32] |               |               |               |                |      | RTA   | RETI           |     |     | FLP |     |     |
 
 # Condition table
 |       |        |                                               |

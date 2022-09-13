@@ -80,7 +80,7 @@ impl Cpu {
     fn relative_to_absolute(&self, relative_address: u32) -> u32 {
         self.instruction_pointer.wrapping_add(relative_address)
     }
-    fn read_source(&self, source: Operand) -> (u32, u32) {
+    fn read_source(&mut self, source: Operand) -> (u32, u32) {
         let mut instruction_pointer_offset = 2; // increment past opcode half
         let source_value = match source {
             Operand::Register => {
@@ -2344,7 +2344,8 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::ImmediatePtr(_) => {
-                        let pointer = self.relative_to_absolute(self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset));
+                        let word = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.relative_to_absolute(word);
                         if should_run {
                             self.bus.memory.write_32(pointer, self.relative_to_absolute(source_value));
                         }
@@ -2527,14 +2528,16 @@ impl Cpu {
                         let pointer = self.read_register(register);
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                         if should_run {
-                            self.bus.write_io(self.bus.memory.read_32(pointer), source_value);
+                            let word = self.bus.memory.read_32(pointer);
+                            self.bus.write_io(word, source_value);
                         }
                     }
                     Operand::ImmediatePtr(_) => {
                         let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset);
                         instruction_pointer_offset += 4; // increment past 32 bit pointer
                         if should_run {
-                            self.bus.write_io(self.bus.memory.read_32(pointer), source_value);
+                            let word = self.bus.memory.read_32(pointer);
+                            self.bus.write_io(word, source_value);
                         }
                     }
                     _ => panic!("Attempting to use an immediate value as a destination"),
@@ -2591,6 +2594,14 @@ impl Cpu {
                 let should_run = self.check_condition(condition);
                 if should_run {
                     self.bus.memory.flush_tlb(Some(source_value));
+                }
+                self.instruction_pointer + instruction_pointer_offset
+            }
+            Instruction::Flp(condition, source) => {
+                let (source_value, instruction_pointer_offset) = self.read_source(source);
+                let should_run = self.check_condition(condition);
+                if should_run {
+                    self.bus.memory.flush_page(source_value);
                 }
                 self.instruction_pointer + instruction_pointer_offset
             }
@@ -2688,6 +2699,7 @@ enum Instruction {
     Mse(Condition),
     Mcl(Condition),
     Tlb(Condition, Operand),
+    Flp(Condition, Operand),
 }
 
 impl Instruction {
@@ -2787,6 +2799,7 @@ impl Instruction {
             0x0D => Some(Instruction::Mse(condition)),
             0x1D => Some(Instruction::Mcl(condition)),
             0x2D => Some(Instruction::Tlb(condition, source)),
+            0x3D => Some(Instruction::Flp(condition, source)),
 
             _ => None,
         }

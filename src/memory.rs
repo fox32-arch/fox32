@@ -1,7 +1,5 @@
 // memory.rs
 
-const DEBUG: bool = false;
-
 use crate::error;
 use crate::cpu::Exception;
 
@@ -84,54 +82,58 @@ impl Memory {
         file.write_all(self.ram()).expect("failed to write memory dump file");
     }
 
+    // each table contains 1024 entries
+    // the paging directory contains pointers to paging tables with the following format:
+    // bit 0: present
+    // remaining bits are ignored, should be zero
+    // bits 12-31: physical address of paging table
+
+    // the paging table contains pointers to physical memory pages with the following format:
+    // bit 0: present
+    // bit 1: r/w
+    // remaining bits are ignored, should be zero
+    // bits 12-31: physical address
+
     pub fn flush_tlb(&self, paging_directory_address: Option<u32>) {
-        let directory_address = if let Some(address) = paging_directory_address {
+        if let Some(address) = paging_directory_address {
             *self.paging_directory_address() = address;
-            address
-        } else {
-            *self.paging_directory_address()
         };
 
         self.tlb().clear();
-
-        // each table contains 1024 entries
-        // the paging directory contains pointers to paging tables with the following format:
-        // bit 0: present
-        // remaining bits are ignored, should be zero
-        // bits 12-31: physical address of paging table
-
-        // the paging table contains pointers to physical memory pages with the following format:
-        // bit 0: present
-        // bit 1: r/w
-        // remaining bits are ignored, should be zero
-        // bits 12-31: physical address
-
-        for directory_index in 0..1024 {
-            let directory = self.read_32(directory_address + (directory_index * 4));
-            let dir_present = directory & 0b1 != 0;
-            let dir_address = directory & 0xFFFFF000;
-            if dir_present {
-                for table_index in 0..1024 {
-                    let table = self.read_32(dir_address + (table_index * 4));
-                    let table_present = table & 0b01 != 0;
-                    let table_rw = table & 0b10 != 0;
-                    let table_address = table & 0xFFFFF000;
-
-                    if table_present {
-                        let tlb_entry = MemoryPage {
-                            physical_address: table_address,
-                            present: table_present,
-                            rw: table_rw,
-                        };
-                        self.tlb().entry((directory_index << 22) | (table_index << 12)).or_insert(tlb_entry);
-                    }
-                }
-            }
-        }
-        if DEBUG { println!("{:#X?}", self.tlb()); }
     }
 
-    pub fn virtual_to_physical(&self, virtual_address: u32) -> Option<(u32, bool)> {
+    pub fn flush_page(&self, virtual_address: u32) {
+        let virtual_page = virtual_address & 0xFFFFF000;
+        self.tlb().remove(&virtual_page);
+    }
+
+    pub fn insert_tlb_entry_from_tables(&mut self, page_directory_index: u32, page_table_index: u32) -> bool {
+        let old_state = *self.mmu_enabled();
+        *self.mmu_enabled() = false;
+        let directory_address = *self.paging_directory_address();
+        let directory = self.read_32(directory_address + (page_directory_index * 4));
+        let dir_present = directory & 0b1 != 0;
+        let dir_address = directory & 0xFFFFF000;
+        if dir_present {
+            let table = self.read_32(dir_address + (page_table_index * 4));
+            let table_present = table & 0b01 != 0;
+            let table_rw = table & 0b10 != 0;
+            let table_address = table & 0xFFFFF000;
+
+            if table_present {
+                let tlb_entry = MemoryPage {
+                    physical_address: table_address,
+                    present: table_present,
+                    rw: table_rw,
+                };
+                self.tlb().entry((page_directory_index << 22) | (page_table_index << 12)).or_insert(tlb_entry);
+            }
+        }
+        *self.mmu_enabled() = old_state;
+        dir_present
+    }
+
+    pub fn virtual_to_physical(&mut self, virtual_address: u32) -> Option<(u32, bool)> {
         let virtual_page = virtual_address & 0xFFFFF000;
         let offset = virtual_address & 0x00000FFF;
         let physical_page = self.tlb().get(&virtual_page);
@@ -143,12 +145,32 @@ impl Memory {
                     None
                 }
             },
-            None => None,
+            None => {
+                let page_directory_index = virtual_address >> 22;
+                let page_table_index = (virtual_address >> 12) & 0x03FF;
+                let dir_present = self.insert_tlb_entry_from_tables(page_directory_index, page_table_index);
+                if !dir_present {
+                    return None;
+                }
+                // try again after inserting the TLB entry
+                let physical_page = self.tlb().get(&virtual_page);
+                let physical_address = match physical_page {
+                    Some(page) => {
+                        if page.present {
+                            Some((page.physical_address | offset, page.rw))
+                        } else {
+                            None
+                        }
+                    },
+                    None => None,
+                };
+                physical_address
+            },
         };
         physical_address
     }
 
-    pub fn read_8(&self, mut address: u32) -> u8 {
+    pub fn read_8(&mut self, mut address: u32) -> u8 {
         if *self.mmu_enabled() {
             (address, _) = self.virtual_to_physical(address as u32).unwrap_or_else(|| {
                 self.exception_sender().send(Exception::PageFault(address)).unwrap();
@@ -173,18 +195,18 @@ impl Memory {
             }
         }
     }
-    pub fn read_16(&self, address: u32) -> u16 {
+    pub fn read_16(&mut self, address: u32) -> u16 {
         (self.read_8(address) as u16) |
         (self.read_8(address + 1) as u16) << 8
     }
-    pub fn read_32(&self, address: u32) -> u32 {
+    pub fn read_32(&mut self, address: u32) -> u32 {
         (self.read_8(address) as u32) |
         (self.read_8(address + 1) as u32) <<  8 |
         (self.read_8(address + 2) as u32) << 16 |
         (self.read_8(address + 3) as u32) << 24
     }
 
-    pub fn write_8(&self, mut address: u32, byte: u8) {
+    pub fn write_8(&mut self, mut address: u32, byte: u8) {
         let mut writable = true;
         if *self.mmu_enabled() {
             (address, writable) = self.virtual_to_physical(address as u32).unwrap_or_else(|| {
@@ -212,11 +234,11 @@ impl Memory {
             self.exception_sender().send(Exception::PageFault(address)).unwrap();
         }
     }
-    pub fn write_16(&self, address: u32, half: u16) {
+    pub fn write_16(&mut self, address: u32, half: u16) {
         self.write_8(address, (half & 0x00FF) as u8);
         self.write_8(address + 1, (half >> 8) as u8);
     }
-    pub fn write_32(&self, address: u32, word: u32) {
+    pub fn write_32(&mut self, address: u32, word: u32) {
         self.write_8(address, (word & 0x000000FF) as u8);
         self.write_8(address + 1, ((word & 0x0000FF00) >>  8) as u8);
         self.write_8(address + 2, ((word & 0x00FF0000) >> 16) as u8);
