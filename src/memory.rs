@@ -220,10 +220,14 @@ impl Memory {
         self.read_opt_8(address).unwrap_or_else(|| unsafe { longjmp(onfault, Exception::PageFaultRead(address)) })
     }
     pub fn read_16(&mut self, onfault: &JumpEnv<Exception>, address: u32) -> u16 {
-        self.read_opt_16(address).unwrap_or_else(|| unsafe { longjmp(onfault, Exception::PageFaultRead(address)) })
+        (self.read_opt_8(address).unwrap_or_else(|| unsafe { longjmp(onfault, Exception::PageFaultRead(address)) }) as u16) |
+        (self.read_opt_8(address + 1).unwrap_or_else(|| unsafe { longjmp(onfault, Exception::PageFaultRead(address + 1)) }) as u16) << 8
     }
     pub fn read_32(&mut self, onfault: &JumpEnv<Exception>, address: u32) -> u32 {
-        self.read_opt_32(address).unwrap_or_else(|| unsafe { longjmp(onfault, Exception::PageFaultRead(address)) })
+        (self.read_opt_8(address).unwrap_or_else(|| unsafe { longjmp(onfault, Exception::PageFaultRead(address)) }) as u32) |
+        (self.read_opt_8(address + 1).unwrap_or_else(|| unsafe { longjmp(onfault, Exception::PageFaultRead(address + 1)) }) as u32) <<  8 |
+        (self.read_opt_8(address + 2).unwrap_or_else(|| unsafe { longjmp(onfault, Exception::PageFaultRead(address + 2)) }) as u32) << 16 |
+        (self.read_opt_8(address + 3).unwrap_or_else(|| unsafe { longjmp(onfault, Exception::PageFaultRead(address + 3)) }) as u32) << 24
     }
 
     pub fn write_8(&mut self, mut address: u32, byte: u8) {
