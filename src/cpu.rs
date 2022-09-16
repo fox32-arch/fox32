@@ -168,7 +168,7 @@ impl Cpu {
     pub fn push_stack_8(&mut self, byte: u8) {
         let decremented_stack_pointer = self.stack_pointer.overflowing_sub(1);
         self.stack_pointer = decremented_stack_pointer.0;
-        self.bus.memory.write_8(self.stack_pointer, byte);
+        self.bus.memory.write_8(&self.onfault, self.stack_pointer, byte);
     }
     pub fn pop_stack_8(&mut self) -> u8 {
         let byte = self.bus.memory.read_8(&self.onfault, self.stack_pointer);
@@ -179,7 +179,7 @@ impl Cpu {
     pub fn push_stack_16(&mut self, half: u16) {
         let decremented_stack_pointer = self.stack_pointer.overflowing_sub(2);
         self.stack_pointer = decremented_stack_pointer.0;
-        self.bus.memory.write_16(self.stack_pointer, half);
+        self.bus.memory.write_16(&self.onfault, self.stack_pointer, half);
     }
     pub fn pop_stack_16(&mut self) -> u16 {
         let half = self.bus.memory.read_16(&self.onfault, self.stack_pointer);
@@ -190,7 +190,7 @@ impl Cpu {
     pub fn push_stack_32(&mut self, word: u32) {
         let decremented_stack_pointer = self.stack_pointer.overflowing_sub(4);
         self.stack_pointer = decremented_stack_pointer.0;
-        self.bus.memory.write_32(self.stack_pointer, word);
+        self.bus.memory.write_32(&self.onfault, self.stack_pointer, word);
     }
     pub fn pop_stack_32(&mut self) -> u32 {
         let word = self.bus.memory.read_32(&self.onfault, self.stack_pointer);
@@ -345,7 +345,7 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer).overflowing_add(source_value as u8);
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result.0);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -353,7 +353,7 @@ impl Cpu {
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer).overflowing_add(source_value as u16);
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result.0);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -361,7 +361,7 @@ impl Cpu {
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer).overflowing_add(source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result.0);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -375,7 +375,7 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer).overflowing_add(source_value as u8);
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result.0);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -383,7 +383,7 @@ impl Cpu {
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer).overflowing_add(source_value as u16);
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result.0);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -391,7 +391,7 @@ impl Cpu {
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer).overflowing_add(source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result.0);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -444,7 +444,7 @@ impl Cpu {
                             Size::Byte => {
                                 if should_run {
                                     let result = self.bus.memory.read_8(&self.onfault, pointer).overflowing_add(1);
-                                    self.bus.memory.write_8(pointer, result.0);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -452,7 +452,7 @@ impl Cpu {
                             Size::Half => {
                                 if should_run {
                                     let result = self.bus.memory.read_16(&self.onfault, pointer).overflowing_add(1);
-                                    self.bus.memory.write_16(pointer, result.0);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -460,7 +460,7 @@ impl Cpu {
                             Size::Word => {
                                 if should_run {
                                     let result = self.bus.memory.read_32(&self.onfault, pointer).overflowing_add(1);
-                                    self.bus.memory.write_32(pointer, result.0);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -474,7 +474,7 @@ impl Cpu {
                             Size::Byte => {
                                 if should_run {
                                     let result = self.bus.memory.read_8(&self.onfault, pointer).overflowing_add(1);
-                                    self.bus.memory.write_8(pointer, result.0);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -482,7 +482,7 @@ impl Cpu {
                             Size::Half => {
                                 if should_run {
                                     let result = self.bus.memory.read_16(&self.onfault, pointer).overflowing_add(1);
-                                    self.bus.memory.write_16(pointer, result.0);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -490,7 +490,7 @@ impl Cpu {
                             Size::Word => {
                                 if should_run {
                                     let result = self.bus.memory.read_32(&self.onfault, pointer).overflowing_add(1);
-                                    self.bus.memory.write_32(pointer, result.0);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -543,7 +543,7 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer).overflowing_sub(source_value as u8);
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result.0);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -551,7 +551,7 @@ impl Cpu {
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer).overflowing_sub(source_value as u16);
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result.0);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -559,7 +559,7 @@ impl Cpu {
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer).overflowing_sub(source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result.0);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -573,7 +573,7 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer).overflowing_sub(source_value as u8);
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result.0);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -581,7 +581,7 @@ impl Cpu {
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer).overflowing_sub(source_value as u16);
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result.0);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -589,7 +589,7 @@ impl Cpu {
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer).overflowing_sub(source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result.0);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -642,7 +642,7 @@ impl Cpu {
                             Size::Byte => {
                                 if should_run {
                                     let result = self.bus.memory.read_8(&self.onfault, pointer).overflowing_sub(1);
-                                    self.bus.memory.write_8(pointer, result.0);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -650,7 +650,7 @@ impl Cpu {
                             Size::Half => {
                                 if should_run {
                                     let result = self.bus.memory.read_16(&self.onfault, pointer).overflowing_sub(1);
-                                    self.bus.memory.write_16(pointer, result.0);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -658,7 +658,7 @@ impl Cpu {
                             Size::Word => {
                                 if should_run {
                                     let result = self.bus.memory.read_32(&self.onfault, pointer).overflowing_sub(1);
-                                    self.bus.memory.write_32(pointer, result.0);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -672,7 +672,7 @@ impl Cpu {
                             Size::Byte => {
                                 if should_run {
                                     let result = self.bus.memory.read_8(&self.onfault, pointer).overflowing_sub(1);
-                                    self.bus.memory.write_8(pointer, result.0);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -680,7 +680,7 @@ impl Cpu {
                             Size::Half => {
                                 if should_run {
                                     let result = self.bus.memory.read_16(&self.onfault, pointer).overflowing_sub(1);
-                                    self.bus.memory.write_16(pointer, result.0);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -688,7 +688,7 @@ impl Cpu {
                             Size::Word => {
                                 if should_run {
                                     let result = self.bus.memory.read_32(&self.onfault, pointer).overflowing_sub(1);
-                                    self.bus.memory.write_32(pointer, result.0);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -741,7 +741,7 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer).overflowing_mul(source_value as u8);
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result.0);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -749,7 +749,7 @@ impl Cpu {
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer).overflowing_mul(source_value as u16);
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result.0);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -757,7 +757,7 @@ impl Cpu {
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer).overflowing_mul(source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result.0);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -771,7 +771,7 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer).overflowing_mul(source_value as u8);
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result.0);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -779,7 +779,7 @@ impl Cpu {
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer).overflowing_mul(source_value as u16);
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result.0);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -787,7 +787,7 @@ impl Cpu {
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer).overflowing_mul(source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result.0);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -837,21 +837,21 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer).overflowing_div(source_value as u8);
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result.0);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                 }
                             }
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer).overflowing_div(source_value as u16);
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result.0);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                 }
                             }
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer).overflowing_div(source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result.0);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                 }
                             }
@@ -864,21 +864,21 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer).overflowing_div(source_value as u8);
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result.0);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                 }
                             }
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer).overflowing_div(source_value as u16);
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result.0);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                 }
                             }
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer).overflowing_div(source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result.0);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result.0);
                                     self.flag.zero = result.0 == 0;
                                 }
                             }
@@ -927,21 +927,21 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer) % source_value as u8;
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer) % source_value as u16;
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer) % source_value;
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
@@ -954,21 +954,21 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer) % source_value as u8;
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer) % source_value as u16;
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer) % source_value;
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
@@ -1018,21 +1018,21 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer) & source_value as u8;
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer) & source_value as u16;
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer) & source_value;
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
@@ -1045,21 +1045,21 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer) & source_value as u8;
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer) & source_value as u16;
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer) & source_value;
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
@@ -1108,21 +1108,21 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer) | source_value as u8;
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer) | source_value as u16;
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer) | source_value;
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
@@ -1135,21 +1135,21 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer) | source_value as u8;
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer) | source_value as u16;
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer) | source_value;
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
@@ -1198,21 +1198,21 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer) ^ source_value as u8;
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer) ^ source_value as u16;
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer) ^ source_value;
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
@@ -1225,21 +1225,21 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer) ^ source_value as u8;
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer) ^ source_value as u16;
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer) ^ source_value;
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
@@ -1288,21 +1288,21 @@ impl Cpu {
                             Size::Byte => {
                                 let result =!self.bus.memory.read_8(&self.onfault, pointer);
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Half => {
                                 let result = !self.bus.memory.read_16(&self.onfault, pointer);
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Word => {
                                 let result = !self.bus.memory.read_32(&self.onfault, pointer);
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
@@ -1315,21 +1315,21 @@ impl Cpu {
                             Size::Byte => {
                                 let result = !self.bus.memory.read_8(&self.onfault, pointer);
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Half => {
                                 let result = !self.bus.memory.read_16(&self.onfault, pointer);
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Word => {
                                 let result = !self.bus.memory.read_32(&self.onfault, pointer);
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                 }
                             }
@@ -1381,7 +1381,7 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer) << source_value;
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 7) != 0;
                                 }
@@ -1389,7 +1389,7 @@ impl Cpu {
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer) << source_value;
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 15) != 0;
                                 }
@@ -1397,7 +1397,7 @@ impl Cpu {
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer) << source_value;
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 31) != 0;
                                 }
@@ -1411,7 +1411,7 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer) << source_value;
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 7) != 0;
                                 }
@@ -1419,7 +1419,7 @@ impl Cpu {
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer) << source_value;
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 15) != 0;
                                 }
@@ -1427,7 +1427,7 @@ impl Cpu {
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer) << source_value;
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 31) != 0;
                                 }
@@ -1480,7 +1480,7 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer) >> source_value as i32;
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
@@ -1488,7 +1488,7 @@ impl Cpu {
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer) >> source_value as i32;
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
@@ -1496,7 +1496,7 @@ impl Cpu {
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer) >> source_value as i32;
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
@@ -1510,7 +1510,7 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer) >> source_value as i32;
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
@@ -1518,7 +1518,7 @@ impl Cpu {
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer) >> source_value as i32;
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
@@ -1526,7 +1526,7 @@ impl Cpu {
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer) >> source_value as i32;
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
@@ -1579,7 +1579,7 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer) >> source_value;
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
@@ -1587,7 +1587,7 @@ impl Cpu {
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer) >> source_value;
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
@@ -1595,7 +1595,7 @@ impl Cpu {
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer) >> source_value;
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
@@ -1609,7 +1609,7 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer) >> source_value;
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
@@ -1617,7 +1617,7 @@ impl Cpu {
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer) >> source_value;
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
@@ -1625,7 +1625,7 @@ impl Cpu {
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer) >> source_value;
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
@@ -1678,7 +1678,7 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer).rotate_left(source_value);
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 7) != 0;
                                 }
@@ -1686,7 +1686,7 @@ impl Cpu {
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer).rotate_left(source_value);
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 15) != 0;
                                 }
@@ -1694,7 +1694,7 @@ impl Cpu {
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer).rotate_left(source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 31) != 0;
                                 }
@@ -1708,7 +1708,7 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer).rotate_left(source_value);
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 7) != 0;
                                 }
@@ -1716,7 +1716,7 @@ impl Cpu {
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer).rotate_left(source_value);
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 15) != 0;
                                 }
@@ -1724,7 +1724,7 @@ impl Cpu {
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer).rotate_left(source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 31) != 0;
                                 }
@@ -1777,7 +1777,7 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer).rotate_right(source_value);
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
@@ -1785,7 +1785,7 @@ impl Cpu {
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer).rotate_right(source_value);
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
@@ -1793,7 +1793,7 @@ impl Cpu {
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer).rotate_right(source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
@@ -1807,7 +1807,7 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer).rotate_right(source_value);
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
@@ -1815,7 +1815,7 @@ impl Cpu {
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer).rotate_right(source_value);
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
@@ -1823,7 +1823,7 @@ impl Cpu {
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer).rotate_right(source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result);
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
@@ -1871,19 +1871,19 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer) | (1 << source_value);
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result);
                                 }
                             }
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer) | (1 << source_value);
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result);
                                 }
                             }
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer) | (1 << source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result);
                                 }
                             }
                         }
@@ -1895,19 +1895,19 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer) | (1 << source_value);
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result);
                                 }
                             }
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer) | (1 << source_value);
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result);
                                 }
                             }
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer) | (1 << source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result);
                                 }
                             }
                         }
@@ -1952,19 +1952,19 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer) & !(1 << source_value);
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result);
                                 }
                             }
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer) & !(1 << source_value);
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result);
                                 }
                             }
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer) & !(1 << source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result);
                                 }
                             }
                         }
@@ -1976,19 +1976,19 @@ impl Cpu {
                             Size::Byte => {
                                 let result = self.bus.memory.read_8(&self.onfault, pointer) & !(1 << source_value);
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, result);
+                                    self.bus.memory.write_8(&self.onfault, pointer, result);
                                 }
                             }
                             Size::Half => {
                                 let result = self.bus.memory.read_16(&self.onfault, pointer) & !(1 << source_value);
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, result);
+                                    self.bus.memory.write_16(&self.onfault, pointer, result);
                                 }
                             }
                             Size::Word => {
                                 let result = self.bus.memory.read_32(&self.onfault, pointer) & !(1 << source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, result);
+                                    self.bus.memory.write_32(&self.onfault, pointer, result);
                                 }
                             }
                         }
@@ -2201,17 +2201,17 @@ impl Cpu {
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, source_value as u8);
+                                    self.bus.memory.write_8(&self.onfault, pointer, source_value as u8);
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, source_value as u16);
+                                    self.bus.memory.write_16(&self.onfault, pointer, source_value as u16);
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, source_value);
+                                    self.bus.memory.write_32(&self.onfault, pointer, source_value);
                                 }
                             }
                         }
@@ -2222,17 +2222,17 @@ impl Cpu {
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    self.bus.memory.write_8(pointer, source_value as u8);
+                                    self.bus.memory.write_8(&self.onfault, pointer, source_value as u8);
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    self.bus.memory.write_16(pointer, source_value as u16);
+                                    self.bus.memory.write_16(&self.onfault, pointer, source_value as u16);
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    self.bus.memory.write_32(pointer, source_value);
+                                    self.bus.memory.write_32(&self.onfault, pointer, source_value);
                                 }
                             }
                         }
@@ -2357,7 +2357,7 @@ impl Cpu {
                         let pointer = self.relative_to_absolute(self.read_register(register));
                         if should_run {
                             // INFO: register contains a relative address instead of an absolute address
-                            self.bus.memory.write_32(pointer, self.relative_to_absolute(source_value));
+                            self.bus.memory.write_32(&self.onfault, pointer, self.relative_to_absolute(source_value));
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
@@ -2365,7 +2365,7 @@ impl Cpu {
                         let word = self.bus.memory.read_32(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
                         let pointer = self.relative_to_absolute(word);
                         if should_run {
-                            self.bus.memory.write_32(pointer, self.relative_to_absolute(source_value));
+                            self.bus.memory.write_32(&self.onfault, pointer, self.relative_to_absolute(source_value));
                         }
                         instruction_pointer_offset += 4; // increment past 32 bit pointer
                     }
@@ -2431,19 +2431,19 @@ impl Cpu {
                             Size::Byte => {
                                 if should_run {
                                     let value = self.pop_stack_8();
-                                    self.bus.memory.write_8(pointer, value);
+                                    self.bus.memory.write_8(&self.onfault, pointer, value);
                                 }
                             }
                             Size::Half => {
                                 if should_run {
                                     let value = self.pop_stack_16();
-                                    self.bus.memory.write_16(pointer, value);
+                                    self.bus.memory.write_16(&self.onfault, pointer, value);
                                 }
                             }
                             Size::Word => {
                                 if should_run {
                                     let value = self.pop_stack_32();
-                                    self.bus.memory.write_32(pointer, value);
+                                    self.bus.memory.write_32(&self.onfault, pointer, value);
                                 }
                             }
                         }
@@ -2455,19 +2455,19 @@ impl Cpu {
                             Size::Byte => {
                                 if should_run {
                                     let value = self.pop_stack_8();
-                                    self.bus.memory.write_8(pointer, value);
+                                    self.bus.memory.write_8(&self.onfault, pointer, value);
                                 }
                             }
                             Size::Half => {
                                 if should_run {
                                     let value = self.pop_stack_16();
-                                    self.bus.memory.write_16(pointer, value);
+                                    self.bus.memory.write_16(&self.onfault, pointer, value);
                                 }
                             }
                             Size::Word => {
                                 if should_run {
                                     let value = self.pop_stack_32();
-                                    self.bus.memory.write_32(pointer, value);
+                                    self.bus.memory.write_32(&self.onfault, pointer, value);
                                 }
                             }
                         }
@@ -2515,7 +2515,7 @@ impl Cpu {
                         let value = self.bus.read_io(source_value);
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                         if should_run {
-                            self.bus.memory.write_32(pointer, value);
+                            self.bus.memory.write_32(&self.onfault, pointer, value);
                         }
                     }
                     Operand::ImmediatePtr(_) => {
@@ -2523,7 +2523,7 @@ impl Cpu {
                         let value = self.bus.read_io(source_value);
                         instruction_pointer_offset += 4; // increment past 32 bit pointer
                         if should_run {
-                            self.bus.memory.write_32(pointer, value);
+                            self.bus.memory.write_32(&self.onfault, pointer, value);
                         }
                     }
                     _ => panic!("Attempting to use an immediate value as a destination"),

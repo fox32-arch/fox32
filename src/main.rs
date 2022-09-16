@@ -11,7 +11,7 @@ pub mod setjmp;
 
 use audio::AudioChannel;
 use bus::Bus;
-use cpu::{Cpu, Exception, Interrupt};
+use cpu::{Cpu, Interrupt};
 use keyboard::Keyboard;
 use mouse::Mouse;
 use disk::DiskController;
@@ -86,9 +86,9 @@ fn main() {
     let audio_channel_2 = Arc::new(Mutex::new(AudioChannel::new(2)));
     let audio_channel_3 = Arc::new(Mutex::new(AudioChannel::new(3)));
 
-    let (exception_sender, exception_receiver) = mpsc::channel::<Exception>();
+    //let (exception_sender, exception_receiver) = mpsc::channel::<Exception>();
 
-    let memory = Memory::new(read_rom().as_slice(), exception_sender);
+    let memory = Memory::new(read_rom().as_slice());
     let mut bus = Bus {
         memory: memory.clone(),
         audio_channel_0: audio_channel_0.clone(),
@@ -116,12 +116,12 @@ fn main() {
     let ram_size = memory_cpu.ram().len();
     let ram_bottom_address = MEMORY_RAM_START;
     let ram_top_address = ram_bottom_address + ram_size - 1;
-    println!("RAM: {:.2} MiB mapped at {:#010X}-{:#010X}", ram_size / 1048576, ram_bottom_address, ram_top_address);
+    println!("RAM: {:.2} MiB mapped at physical {:#010X}-{:#010X}", ram_size / 1048576, ram_bottom_address, ram_top_address);
 
     let rom_size = memory_cpu.rom().len();
     let rom_bottom_address = MEMORY_ROM_START;
     let rom_top_address = rom_bottom_address + rom_size - 1;
-    println!("ROM: {:.2} KiB mapped at {:#010X}-{:#010X}", rom_size / 1024, rom_bottom_address, rom_top_address);
+    println!("ROM: {:.2} KiB mapped at physical {:#010X}-{:#010X}", rom_size / 1024, rom_bottom_address, rom_top_address);
 
     let mut cpu = Cpu::new(bus);
 
@@ -163,9 +163,9 @@ fn main() {
                     cpu.interrupt(Interrupt::Exception(exception));
                 }
                 while !cpu.halted {
-                    if let Ok(exception) = exception_receiver.try_recv() {
+                    /*if let Ok(exception) = exception_receiver.try_recv() {
                         cpu.interrupt(Interrupt::Exception(exception));
-                    }
+                    }*/
                     if let Ok(interrupt) = interrupt_receiver.try_recv() {
                         cpu.interrupt(interrupt);
                     }

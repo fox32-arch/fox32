@@ -7,7 +7,6 @@ use crate::setjmp::{JumpEnv, longjmp};
 use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::mpsc::Sender;
 use std::io::Write;
 use std::fs::File;
 
@@ -33,11 +32,10 @@ struct MemoryInner {
     mmu_enabled: Box<bool>,
     tlb: Box<HashMap<u32, MemoryPage>>,
     paging_directory_address: Box<u32>,
-    exception_sender: Sender<Exception>,
 }
 
 impl MemoryInner {
-    pub fn new(rom: &[u8], exception_sender: Sender<Exception>) -> Self {
+    pub fn new(rom: &[u8]) -> Self {
         let mut this = Self {
             // HACK: allocate directly on the heap to avoid a stack overflow
             //       at runtime while trying to move around a 64MB array
@@ -46,7 +44,6 @@ impl MemoryInner {
             mmu_enabled: Box::from(false),
             tlb: Box::from(HashMap::with_capacity(1024)),
             paging_directory_address: Box::from(0x00000000),
-            exception_sender,
         };
         this.rom.as_mut_slice().write(rom).expect("failed to copy ROM to memory");
         this
@@ -63,8 +60,8 @@ unsafe impl Send for Memory {}
 unsafe impl Sync for Memory {}
 
 impl Memory {
-    pub fn new(rom: &[u8], exception_sender: Sender<Exception>) -> Self {
-        Self(Arc::new(UnsafeCell::new(MemoryInner::new(rom, exception_sender))))
+    pub fn new(rom: &[u8]) -> Self {
+        Self(Arc::new(UnsafeCell::new(MemoryInner::new(rom))))
     }
 
     fn inner(&self) -> &mut MemoryInner {
@@ -76,7 +73,6 @@ impl Memory {
     pub fn mmu_enabled(&self) -> &mut bool { &mut self.inner().mmu_enabled }
     pub fn tlb(&self) -> &mut HashMap<u32, MemoryPage> { &mut self.inner().tlb }
     pub fn paging_directory_address(&self) -> &mut u32 { &mut self.inner().paging_directory_address }
-    pub fn exception_sender(&self) -> &mut Sender<Exception> { &mut self.inner().exception_sender }
 
     pub fn dump(&self) {
         let mut file = File::create("memory.dump").expect("failed to open memory dump file");
@@ -230,47 +226,42 @@ impl Memory {
         (self.read_opt_8(address + 3).unwrap_or_else(|| unsafe { longjmp(onfault, Exception::PageFaultRead(address + 3)) }) as u32) << 24
     }
 
-    pub fn write_8(&mut self, mut address: u32, byte: u8) {
+    pub fn write_8(&mut self, onfault: &JumpEnv<Exception>, mut address: u32, byte: u8) {
         let original_address = address;
         let mut writable = true;
-        let mut ok = true;
         if *self.mmu_enabled() {
             (address, writable) = self.virtual_to_physical(address as u32).unwrap_or_else(|| {
-                self.exception_sender().send(Exception::PageFaultWrite(original_address)).unwrap();
-                ok = false;
-                (0, false)
+                unsafe { longjmp(onfault, Exception::PageFaultWrite(original_address)) }
             });
         }
 
-        if ok {
-            if writable {
-                let address = address as usize;
+        if writable {
+            let address = address as usize;
 
-                if address >= MEMORY_ROM_START && address < MEMORY_ROM_START + MEMORY_ROM_SIZE {
-                    error(&format!("attempting to write to ROM address: {:#010X}", address));
-                }
-
-                match self.ram().get_mut(address - MEMORY_RAM_START) {
-                    Some(value) => {
-                        *value = byte;
-                    }
-                    None => {
-                        self.exception_sender().send(Exception::PageFaultWrite(original_address)).unwrap();
-                    }
-                }
-            } else {
-                self.exception_sender().send(Exception::PageFaultWrite(original_address)).unwrap();
+            if address >= MEMORY_ROM_START && address < MEMORY_ROM_START + MEMORY_ROM_SIZE {
+                error(&format!("attempting to write to ROM address: {:#010X}", address));
             }
+
+            match self.ram().get_mut(address - MEMORY_RAM_START) {
+                Some(value) => {
+                    *value = byte;
+                }
+                None => {
+                    unsafe { longjmp(onfault, Exception::PageFaultWrite(original_address)) }
+                }
+            }
+        } else {
+            unsafe { longjmp(onfault, Exception::PageFaultWrite(original_address)) }
         }
     }
-    pub fn write_16(&mut self, address: u32, half: u16) {
-        self.write_8(address, (half & 0x00FF) as u8);
-        self.write_8(address + 1, (half >> 8) as u8);
+    pub fn write_16(&mut self, onfault: &JumpEnv<Exception>, address: u32, half: u16) {
+        self.write_8(onfault, address, (half & 0x00FF) as u8);
+        self.write_8(onfault, address + 1, (half >> 8) as u8);
     }
-    pub fn write_32(&mut self, address: u32, word: u32) {
-        self.write_8(address, (word & 0x000000FF) as u8);
-        self.write_8(address + 1, ((word & 0x0000FF00) >>  8) as u8);
-        self.write_8(address + 2, ((word & 0x00FF0000) >> 16) as u8);
-        self.write_8(address + 3, ((word & 0xFF000000) >> 24) as u8);
+    pub fn write_32(&mut self, onfault: &JumpEnv<Exception>, address: u32, word: u32) {
+        self.write_8(onfault, address, (word & 0x000000FF) as u8);
+        self.write_8(onfault, address + 1, ((word & 0x0000FF00) >>  8) as u8);
+        self.write_8(onfault, address + 2, ((word & 0x00FF0000) >> 16) as u8);
+        self.write_8(onfault, address + 3, ((word & 0xFF000000) >> 24) as u8);
     }
 }
