@@ -2,6 +2,7 @@
 
 use crate::error;
 use crate::cpu::Exception;
+use crate::setjmp::{JumpEnv, longjmp};
 
 use std::cell::UnsafeCell;
 use std::collections::HashMap;
@@ -111,26 +112,39 @@ impl Memory {
         let old_state = *self.mmu_enabled();
         *self.mmu_enabled() = false;
         let directory_address = *self.paging_directory_address();
-        let directory = self.read_32(directory_address + (page_directory_index * 4));
-        let dir_present = directory & 0b1 != 0;
-        let dir_address = directory & 0xFFFFF000;
-        if dir_present {
-            let table = self.read_32(dir_address + (page_table_index * 4));
-            let table_present = table & 0b01 != 0;
-            let table_rw = table & 0b10 != 0;
-            let table_address = table & 0xFFFFF000;
+        let directory = self.read_opt_32(directory_address + (page_directory_index * 4));
+        match directory {
+            Some(directory) => {
+                let dir_present = directory & 0b1 != 0;
+                let dir_address = directory & 0xFFFFF000;
+                if dir_present {
+                    let table = self.read_opt_32(dir_address + (page_table_index * 4));
+                    match table {
+                        Some(table) => {
+                            let table_present = table & 0b01 != 0;
+                            let table_rw = table & 0b10 != 0;
+                            let table_address = table & 0xFFFFF000;
 
-            if table_present {
-                let tlb_entry = MemoryPage {
-                    physical_address: table_address,
-                    present: table_present,
-                    rw: table_rw,
-                };
-                self.tlb().entry((page_directory_index << 22) | (page_table_index << 12)).or_insert(tlb_entry);
+                            if table_present {
+                                let tlb_entry = MemoryPage {
+                                    physical_address: table_address,
+                                    present: table_present,
+                                    rw: table_rw,
+                                };
+                                self.tlb().entry((page_directory_index << 22) | (page_table_index << 12)).or_insert(tlb_entry);
+                            }
+                        },
+                        None => {}
+                    }
+                }
+                *self.mmu_enabled() = old_state;
+                dir_present
+            },
+            None => {
+                *self.mmu_enabled() = old_state;
+                false
             }
         }
-        *self.mmu_enabled() = old_state;
-        dir_present
     }
 
     pub fn virtual_to_physical(&mut self, virtual_address: u32) -> Option<(u32, bool)> {
@@ -170,47 +184,53 @@ impl Memory {
         physical_address
     }
 
-    pub fn read_8(&mut self, mut address: u32) -> u8 {
+    pub fn read_opt_8(&mut self, mut address: u32) -> Option<u8> {
         if *self.mmu_enabled() {
-            (address, _) = self.virtual_to_physical(address as u32).unwrap_or_else(|| {
-                self.exception_sender().send(Exception::PageFault(address)).unwrap();
-                (0, false)
-            });
+            let address_maybe = self.virtual_to_physical(address as u32);
+            match address_maybe {
+                Some(addr) => address = addr.0,
+                None => return None,
+            }
         }
 
         let address = address as usize;
 
-        let result = if address >= MEMORY_ROM_START && address < MEMORY_ROM_START + MEMORY_ROM_SIZE {
-            self.rom().get(address - MEMORY_ROM_START)
+        if address >= MEMORY_ROM_START && address < MEMORY_ROM_START + MEMORY_ROM_SIZE {
+            self.rom().get(address - MEMORY_ROM_START).map(|value| *value)
         } else {
-            self.ram().get(address - MEMORY_RAM_START)
-        };
-
-        match result {
-            Some(value) => {
-                *value
-            }
-            None => {
-                error(&format!("attempting to read from unmapped physical memory address: {:#010X}", address));
-            }
+            self.ram().get(address - MEMORY_RAM_START).map(|value| *value)
         }
     }
-    pub fn read_16(&mut self, address: u32) -> u16 {
-        (self.read_8(address) as u16) |
-        (self.read_8(address + 1) as u16) << 8
+    pub fn read_opt_16(&mut self, address: u32) -> Option<u16> {
+        Some(
+            (self.read_opt_8(address)? as u16) |
+            (self.read_opt_8(address + 1)? as u16) << 8
+        )
     }
-    pub fn read_32(&mut self, address: u32) -> u32 {
-        (self.read_8(address) as u32) |
-        (self.read_8(address + 1) as u32) <<  8 |
-        (self.read_8(address + 2) as u32) << 16 |
-        (self.read_8(address + 3) as u32) << 24
+    pub fn read_opt_32(&mut self, address: u32) -> Option<u32> {
+        Some(
+            (self.read_opt_8(address)? as u32) |
+            (self.read_opt_8(address + 1)? as u32) <<  8 |
+            (self.read_opt_8(address + 2)? as u32) << 16 |
+            (self.read_opt_8(address + 3)? as u32) << 24
+        )
+    }
+
+    pub fn read_8(&mut self, onfault: &JumpEnv<Exception>, address: u32) -> u8 {
+        self.read_opt_8(address).unwrap_or_else(|| unsafe { longjmp(onfault, Exception::PageFaultRead(address)) })
+    }
+    pub fn read_16(&mut self, onfault: &JumpEnv<Exception>, address: u32) -> u16 {
+        self.read_opt_16(address).unwrap_or_else(|| unsafe { longjmp(onfault, Exception::PageFaultRead(address)) })
+    }
+    pub fn read_32(&mut self, onfault: &JumpEnv<Exception>, address: u32) -> u32 {
+        self.read_opt_32(address).unwrap_or_else(|| unsafe { longjmp(onfault, Exception::PageFaultRead(address)) })
     }
 
     pub fn write_8(&mut self, mut address: u32, byte: u8) {
         let mut writable = true;
         if *self.mmu_enabled() {
             (address, writable) = self.virtual_to_physical(address as u32).unwrap_or_else(|| {
-                self.exception_sender().send(Exception::PageFault(address)).unwrap();
+                self.exception_sender().send(Exception::PageFaultWrite(address)).unwrap();
                 (0, false)
             });
         }
@@ -231,7 +251,7 @@ impl Memory {
                 }
             }
         } else {
-            self.exception_sender().send(Exception::PageFault(address)).unwrap();
+            self.exception_sender().send(Exception::PageFaultWrite(address)).unwrap();
         }
     }
     pub fn write_16(&mut self, address: u32, half: u16) {

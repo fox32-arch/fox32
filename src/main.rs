@@ -7,6 +7,7 @@ pub mod cpu;
 pub mod keyboard;
 pub mod mouse;
 pub mod disk;
+pub mod setjmp;
 
 use audio::AudioChannel;
 use bus::Bus;
@@ -158,6 +159,9 @@ fn main() {
     builder.spawn({
         move || {
             loop {
+                if let Some(exception) = unsafe { cpu.setjmp() } {
+                    cpu.interrupt(Interrupt::Exception(exception));
+                }
                 while !cpu.halted {
                     if let Ok(exception) = exception_receiver.try_recv() {
                         cpu.interrupt(Interrupt::Exception(exception));
