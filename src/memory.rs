@@ -247,7 +247,7 @@ impl Memory {
                     *value = byte;
                 }
                 None => {
-                    error(&format!("attempting to write to unmapped physical memory address: {:#010X}", address));
+                    self.exception_sender().send(Exception::PageFaultWrite(address as u32)).unwrap();
                 }
             }
         } else {
