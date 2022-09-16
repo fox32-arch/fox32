@@ -231,11 +231,12 @@ impl Memory {
     }
 
     pub fn write_8(&mut self, mut address: u32, byte: u8) {
+        let original_address = address;
         let mut writable = true;
         let mut ok = true;
         if *self.mmu_enabled() {
             (address, writable) = self.virtual_to_physical(address as u32).unwrap_or_else(|| {
-                self.exception_sender().send(Exception::PageFaultWrite(address)).unwrap();
+                self.exception_sender().send(Exception::PageFaultWrite(original_address)).unwrap();
                 ok = false;
                 (0, false)
             });
@@ -254,11 +255,11 @@ impl Memory {
                         *value = byte;
                     }
                     None => {
-                        self.exception_sender().send(Exception::PageFaultWrite(address as u32)).unwrap();
+                        self.exception_sender().send(Exception::PageFaultWrite(original_address)).unwrap();
                     }
                 }
             } else {
-                self.exception_sender().send(Exception::PageFaultWrite(address)).unwrap();
+                self.exception_sender().send(Exception::PageFaultWrite(original_address)).unwrap();
             }
         }
     }
