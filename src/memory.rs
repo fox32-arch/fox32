@@ -232,30 +232,34 @@ impl Memory {
 
     pub fn write_8(&mut self, mut address: u32, byte: u8) {
         let mut writable = true;
+        let mut ok = true;
         if *self.mmu_enabled() {
             (address, writable) = self.virtual_to_physical(address as u32).unwrap_or_else(|| {
                 self.exception_sender().send(Exception::PageFaultWrite(address)).unwrap();
+                ok = false;
                 (0, false)
             });
         }
 
-        if writable {
-            let address = address as usize;
+        if ok {
+            if writable {
+                let address = address as usize;
 
-            if address >= MEMORY_ROM_START && address < MEMORY_ROM_START + MEMORY_ROM_SIZE {
-                error(&format!("attempting to write to ROM address: {:#010X}", address));
-            }
+                if address >= MEMORY_ROM_START && address < MEMORY_ROM_START + MEMORY_ROM_SIZE {
+                    error(&format!("attempting to write to ROM address: {:#010X}", address));
+                }
 
-            match self.ram().get_mut(address - MEMORY_RAM_START) {
-                Some(value) => {
-                    *value = byte;
+                match self.ram().get_mut(address - MEMORY_RAM_START) {
+                    Some(value) => {
+                        *value = byte;
+                    }
+                    None => {
+                        self.exception_sender().send(Exception::PageFaultWrite(address as u32)).unwrap();
+                    }
                 }
-                None => {
-                    self.exception_sender().send(Exception::PageFaultWrite(address as u32)).unwrap();
-                }
+            } else {
+                self.exception_sender().send(Exception::PageFaultWrite(address)).unwrap();
             }
-        } else {
-            self.exception_sender().send(Exception::PageFaultWrite(address)).unwrap();
         }
     }
     pub fn write_16(&mut self, address: u32, half: u16) {
