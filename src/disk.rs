@@ -43,7 +43,7 @@ impl DiskController {
             .set_title(&format!("Select a file to insert"))
             .pick_file();
         match path {
-            Some(path) => Some(File::open(path).expect("failed to open disk image")),
+            Some(path) => Some(File::options().read(true).write(true).open(path).expect("failed to open disk image")),
             None => None,
         }
     }

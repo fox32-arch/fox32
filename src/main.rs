@@ -106,7 +106,7 @@ fn main() {
         let mut args_iter = args.iter();
         args_iter.next();
         for (i, arg) in args_iter.enumerate() {
-            bus.disk_controller.insert(File::open(&arg).expect("failed to load provided disk image"), i as u8);
+            bus.disk_controller.insert(File::options().read(true).write(true).open(&arg).expect("failed to load provided disk image"), i as u8);
         }
     }
 
