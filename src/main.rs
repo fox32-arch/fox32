@@ -28,7 +28,7 @@ use image;
 use log::error;
 use pixels::{Pixels, SurfaceTexture};
 use winit::dpi::LogicalSize;
-use winit::event::{ElementState, Event, WindowEvent};
+use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::{WindowBuilder, Icon};
 use winit_input_helper::WinitInputHelper;
@@ -228,12 +228,8 @@ fn main() {
         if let Event::WindowEvent { ref event, .. } = event {
             if let WindowEvent::KeyboardInput { input, .. } = event {
                 let mut keyboard_lock = keyboard.lock().unwrap();
-                let mut scancode = input.scancode;
-                if input.state == ElementState::Released {
-                    scancode |= 0x80; // "break" scancode
-                }
-                //println!("scancode: {:x}", scancode);
-                keyboard_lock.push(scancode);
+                let keycode = input.virtual_keycode;
+                keyboard_lock.push(keycode, input.state);
             }
         }
 
