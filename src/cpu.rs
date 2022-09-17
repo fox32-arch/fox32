@@ -211,7 +211,8 @@ impl Cpu {
     }
     pub fn interrupt(&mut self, interrupt: Interrupt) {
         if DEBUG { println!("interrupt(): enabled: {}", self.flag.interrupt); }
-        if self.flag.interrupt {
+        let is_exception = if let Interrupt::Exception(_) = interrupt { true } else { false };
+        if self.flag.interrupt || is_exception {
             match interrupt {
                 Interrupt::Request(vector) => {
                     self.handle_interrupt(vector as u16);
