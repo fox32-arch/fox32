@@ -102,10 +102,14 @@ impl Cpu {
                 instruction_pointer_offset += 1; // increment past 8 bit register number
                 value
             }
-            Operand::RegisterPtr => {
+            Operand::RegisterPtr(size) => {
                 let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
                 let pointer = self.read_register(register);
-                let value = self.bus.memory.read_32(&self.onfault, pointer);
+                let value = match size {
+                    Size::Byte => self.bus.memory.read_8(&self.onfault, pointer) as u32,
+                    Size::Half => self.bus.memory.read_16(&self.onfault, pointer) as u32,
+                    Size::Word => self.bus.memory.read_32(&self.onfault, pointer),
+                };
                 instruction_pointer_offset += 1; // increment past 8 bit register number
                 value
             }
@@ -370,7 +374,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::RegisterPtr => {
+                    Operand::RegisterPtr(_) => {
                         let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
                         let pointer = self.read_register(register);
                         match size {
@@ -469,7 +473,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::RegisterPtr => {
+                    Operand::RegisterPtr(_) => {
                         let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
                         let pointer = self.read_register(register);
                         match size {
@@ -568,7 +572,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::RegisterPtr => {
+                    Operand::RegisterPtr(_) => {
                         let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
                         let pointer = self.read_register(register);
                         match size {
@@ -667,7 +671,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::RegisterPtr => {
+                    Operand::RegisterPtr(_) => {
                         let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
                         let pointer = self.read_register(register);
                         match size {
@@ -766,7 +770,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::RegisterPtr => {
+                    Operand::RegisterPtr(_) => {
                         let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
                         let pointer = self.read_register(register);
                         match size {
@@ -862,7 +866,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::RegisterPtr => {
+                    Operand::RegisterPtr(_) => {
                         let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
                         let pointer = self.read_register(register);
                         match size {
@@ -952,7 +956,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::RegisterPtr => {
+                    Operand::RegisterPtr(_) => {
                         let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
                         let pointer = self.read_register(register);
                         match size {
@@ -1043,7 +1047,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::RegisterPtr => {
+                    Operand::RegisterPtr(_) => {
                         let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
                         let pointer = self.read_register(register);
                         match size {
@@ -1133,7 +1137,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::RegisterPtr => {
+                    Operand::RegisterPtr(_) => {
                         let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
                         let pointer = self.read_register(register);
                         match size {
@@ -1223,7 +1227,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::RegisterPtr => {
+                    Operand::RegisterPtr(_) => {
                         let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
                         let pointer = self.read_register(register);
                         match size {
@@ -1313,7 +1317,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::RegisterPtr => {
+                    Operand::RegisterPtr(_) => {
                         let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
                         let pointer = self.read_register(register);
                         match size {
@@ -1406,7 +1410,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::RegisterPtr => {
+                    Operand::RegisterPtr(_) => {
                         let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
                         let pointer = self.read_register(register);
                         match size {
@@ -1505,7 +1509,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::RegisterPtr => {
+                    Operand::RegisterPtr(_) => {
                         let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
                         let pointer = self.read_register(register);
                         match size {
@@ -1604,7 +1608,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::RegisterPtr => {
+                    Operand::RegisterPtr(_) => {
                         let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
                         let pointer = self.read_register(register);
                         match size {
@@ -1703,7 +1707,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::RegisterPtr => {
+                    Operand::RegisterPtr(_) => {
                         let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
                         let pointer = self.read_register(register);
                         match size {
@@ -1802,7 +1806,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::RegisterPtr => {
+                    Operand::RegisterPtr(_) => {
                         let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
                         let pointer = self.read_register(register);
                         match size {
@@ -1896,7 +1900,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::RegisterPtr => {
+                    Operand::RegisterPtr(_) => {
                         let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
                         let pointer = self.read_register(register);
                         match size {
@@ -1977,7 +1981,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::RegisterPtr => {
+                    Operand::RegisterPtr(_) => {
                         let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
                         let pointer = self.read_register(register);
                         match size {
@@ -2058,7 +2062,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::RegisterPtr => {
+                    Operand::RegisterPtr(_) => {
                         let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
                         let pointer = self.read_register(register);
                         match size {
@@ -2143,7 +2147,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::RegisterPtr => {
+                    Operand::RegisterPtr(_) => {
                         let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
                         let pointer = self.read_register(register);
                         match size {
@@ -2227,7 +2231,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::RegisterPtr => {
+                    Operand::RegisterPtr(_) => {
                         let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
                         let pointer = self.read_register(register);
                         match size {
@@ -2384,7 +2388,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::RegisterPtr => {
+                    Operand::RegisterPtr(_) => {
                         let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
                         let pointer = self.relative_to_absolute(self.read_register(register));
                         if should_run {
@@ -2456,7 +2460,7 @@ impl Cpu {
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
-                    Operand::RegisterPtr => {
+                    Operand::RegisterPtr(_) => {
                         let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
                         let pointer = self.read_register(register);
                         match size {
@@ -2545,7 +2549,7 @@ impl Cpu {
                             self.write_register(register, value);
                         }
                     }
-                    Operand::RegisterPtr => {
+                    Operand::RegisterPtr(_) => {
                         let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
                         let pointer = self.read_register(register);
                         let value = self.bus.read_io(source_value);
@@ -2577,7 +2581,7 @@ impl Cpu {
                             self.bus.write_io(self.read_register(register), source_value);
                         }
                     }
-                    Operand::RegisterPtr => {
+                    Operand::RegisterPtr(_) => {
                         let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
                         let pointer = self.read_register(register);
                         instruction_pointer_offset += 1; // increment past 8 bit register number
@@ -2666,7 +2670,7 @@ impl Cpu {
 #[derive(Debug)]
 enum Operand {
     Register,
-    RegisterPtr,
+    RegisterPtr(Size),
     Immediate8,
     Immediate16,
     Immediate32,
@@ -2768,7 +2772,7 @@ impl Instruction {
         let opcode = ((half >> 8) as u8) & 0b00111111;
         let source = match ((half & 0x000F) as u8) & 0b00000011 {
             0x00 => Operand::Register,
-            0x01 => Operand::RegisterPtr,
+            0x01 => Operand::RegisterPtr(size),
             0x02 => match size {
                 Size::Byte => Operand::Immediate8,
                 Size::Half => Operand::Immediate16,
@@ -2779,7 +2783,7 @@ impl Instruction {
         };
         let destination = match (((half & 0x000F) >> 2) as u8) & 0b00000011 {
             0x00 => Operand::Register,
-            0x01 => Operand::RegisterPtr,
+            0x01 => Operand::RegisterPtr(size),
             // 0x02 is invalid, can't use an immediate value as a destination
             0x03 => Operand::ImmediatePtr(size),
             _ => return None,
