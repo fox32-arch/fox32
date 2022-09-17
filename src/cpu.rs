@@ -10,6 +10,7 @@ const DEBUG: bool = false;
 
 #[derive(Copy, Clone)]
 pub struct Flag {
+    pub swap_sp: bool,
     pub interrupt: bool,
     pub carry: bool,
     pub zero: bool,
@@ -17,6 +18,7 @@ pub struct Flag {
 
 impl std::convert::From<Flag> for u8  {
     fn from(flag: Flag) -> u8 {
+        (if flag.swap_sp   { 1 } else { 0 }) << 3 |
         (if flag.interrupt { 1 } else { 0 }) << 2 |
         (if flag.carry     { 1 } else { 0 }) << 1 |
         (if flag.zero      { 1 } else { 0 }) << 0
@@ -25,10 +27,11 @@ impl std::convert::From<Flag> for u8  {
 
 impl std::convert::From<u8> for Flag {
     fn from(byte: u8) -> Self {
+        let swap_sp   = ((byte >> 3) & 1) != 0;
         let interrupt = ((byte >> 2) & 1) != 0;
         let carry     = ((byte >> 1) & 1) != 0;
         let zero      = ((byte >> 0) & 1) != 0;
-        Flag { interrupt, carry, zero }
+        Flag { swap_sp, interrupt, carry, zero }
     }
 }
 
@@ -49,6 +52,7 @@ pub enum Interrupt {
 pub struct Cpu {
     pub instruction_pointer: u32,
     pub stack_pointer: u32,
+    pub exception_stack_pointer: u32,
 
     pub register: [u32; 32],
     pub flag: Flag,
@@ -64,8 +68,9 @@ impl Cpu {
         Cpu {
             instruction_pointer: 0xF0000000,
             stack_pointer: 0x00000000,
+            exception_stack_pointer: 0x00000000,
             register: [0; 32],
-            flag: Flag { interrupt: false, carry: false, zero: false },
+            flag: Flag { swap_sp: false, interrupt: false, carry: false, zero: false },
             halted: false,
             bus,
             onfault: JumpEnv::new(),
@@ -136,6 +141,7 @@ impl Cpu {
         match register {
             0..=31 => self.register[register as usize],
             32 => self.stack_pointer,
+            33 => self.exception_stack_pointer,
             _ => panic!("Invalid register: {}", register),
         }
     }
@@ -143,6 +149,7 @@ impl Cpu {
         match register {
             0..=31 => self.register[register as usize] = word,
             32 => self.stack_pointer = word,
+            33 => self.exception_stack_pointer = word,
             _ => panic!("Invalid register: {}", register),
         };
     }
@@ -163,7 +170,7 @@ impl Cpu {
                 index + 24, self.register[index + 24]
             );
         }
-        println!("rsp: {:#010X}", self.stack_pointer);
+        println!("rsp: {:#010X} | esp: {:#010X}", self.stack_pointer, self.exception_stack_pointer);
     }
     pub fn push_stack_8(&mut self, byte: u8) {
         let decremented_stack_pointer = self.stack_pointer.overflowing_sub(1);
@@ -231,27 +238,52 @@ impl Cpu {
     fn handle_interrupt(&mut self, vector: u16) {
         if DEBUG { println!("interrupt!!! vector: {:#04X}", vector); }
         let address_of_pointer = vector as u32 * 4;
+
         let old_mmu_state = *self.bus.memory.mmu_enabled();
         *self.bus.memory.mmu_enabled() = false;
         let address = self.bus.memory.read_32(&self.onfault, address_of_pointer);
         *self.bus.memory.mmu_enabled() = old_mmu_state;
-        self.push_stack_32(self.instruction_pointer);
-        self.push_stack_8(u8::from(self.flag));
+
+        if self.flag.swap_sp {
+            let old_stack_pointer = self.stack_pointer;
+            self.stack_pointer = self.exception_stack_pointer;
+            self.push_stack_32(old_stack_pointer);
+            self.push_stack_32(self.instruction_pointer);
+            self.push_stack_8(u8::from(self.flag));
+            self.flag.swap_sp = false;
+        } else {
+            self.push_stack_32(self.instruction_pointer);
+            self.push_stack_8(u8::from(self.flag));
+        }
+
         self.flag.interrupt = false; // prevent interrupts while already servicing an interrupt
         self.instruction_pointer = address;
     }
     fn handle_exception(&mut self, vector: u16, operand: Option<u32>) {
         if DEBUG { println!("exception!!! vector: {:#04X}, operand: {:?}", vector, operand); }
         let address_of_pointer = (256 + vector) as u32 * 4;
+
         let old_mmu_state = *self.bus.memory.mmu_enabled();
         *self.bus.memory.mmu_enabled() = false;
         let address = self.bus.memory.read_32(&self.onfault, address_of_pointer);
         *self.bus.memory.mmu_enabled() = old_mmu_state;
-        self.push_stack_32(self.instruction_pointer);
-        self.push_stack_8(u8::from(self.flag));
+
+        if self.flag.swap_sp {
+            let old_stack_pointer = self.stack_pointer;
+            self.stack_pointer = self.exception_stack_pointer;
+            self.push_stack_32(old_stack_pointer);
+            self.push_stack_32(self.instruction_pointer);
+            self.push_stack_8(u8::from(self.flag));
+            self.flag.swap_sp = false;
+        } else {
+            self.push_stack_32(self.instruction_pointer);
+            self.push_stack_8(u8::from(self.flag));
+        }
+
         if let Some(operand) = operand {
             self.push_stack_32(operand);
         }
+
         self.flag.interrupt = false; // prevent interrupts while already servicing an interrupt
         self.instruction_pointer = address;
     }
@@ -2491,7 +2523,11 @@ impl Cpu {
                 let should_run = self.check_condition(condition);
                 if should_run {
                     self.flag = Flag::from(self.pop_stack_8());
-                    self.pop_stack_32()
+                    let instruction_pointer = self.pop_stack_32();
+                    if self.flag.swap_sp {
+                        self.stack_pointer = self.pop_stack_32();
+                    }
+                    instruction_pointer
                 } else {
                     self.instruction_pointer + instruction_pointer_offset
                 }
