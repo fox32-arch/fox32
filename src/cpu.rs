@@ -52,6 +52,7 @@ pub struct Cpu {
     pub instruction_pointer: u32,
     pub stack_pointer: u32,
     pub exception_stack_pointer: u32,
+    pub frame_pointer: u32,
 
     pub register: [u32; 32],
     pub flag: Flag,
@@ -66,6 +67,7 @@ impl Cpu {
             instruction_pointer: 0xF0000000,
             stack_pointer: 0x00000000,
             exception_stack_pointer: 0x00000000,
+            frame_pointer: 0x00000000,
             register: [0; 32],
             flag: Flag { swap_sp: false, interrupt: false, carry: false, zero: false },
             halted: false,
@@ -139,6 +141,7 @@ impl Cpu {
             0..=31 => self.register[register as usize],
             32 => self.stack_pointer,
             33 => self.exception_stack_pointer,
+            34 => self.frame_pointer,
             _ => panic!("Invalid register: {}", register),
         }
     }
@@ -147,6 +150,7 @@ impl Cpu {
             0..=31 => self.register[register as usize] = word,
             32 => self.stack_pointer = word,
             33 => self.exception_stack_pointer = word,
+            34 => self.frame_pointer = word,
             _ => panic!("Invalid register: {}", register),
         };
     }
@@ -168,6 +172,7 @@ impl Cpu {
             );
         }
         println!("rsp: {:#010X} | resp: {:#010X}", self.stack_pointer, self.exception_stack_pointer);
+        println!("rfp: {:#010X}", self.frame_pointer);
     }
     pub fn push_stack_8(&mut self, byte: u8) {
         let decremented_stack_pointer = self.stack_pointer.overflowing_sub(1);
@@ -324,8 +329,6 @@ impl Cpu {
             let next_instruction_pointer = self.execute_instruction(instruction);
             if let Some(next) = next_instruction_pointer {
                 self.instruction_pointer = next;
-            } else {
-                println!("next instruction pointer is None!")
             }
         } else {
             let size = ((opcode & 0b1100000000000000) >> 14) as u8;
