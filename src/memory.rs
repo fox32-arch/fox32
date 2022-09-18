@@ -2,13 +2,13 @@
 
 use crate::error;
 use crate::cpu::Exception;
-use crate::setjmp::{JumpEnv, longjmp};
 
 use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::io::Write;
 use std::fs::File;
+use std::sync::mpsc::Sender;
 
 pub const MEMORY_RAM_SIZE: usize = 0x04000000; // 64 MiB
 pub const MEMORY_ROM_SIZE: usize = 0x00080000; // 512 KiB
@@ -32,10 +32,11 @@ struct MemoryInner {
     mmu_enabled: Box<bool>,
     tlb: Box<HashMap<u32, MemoryPage>>,
     paging_directory_address: Box<u32>,
+    exception_sender: Sender<Exception>,
 }
 
 impl MemoryInner {
-    pub fn new(rom: &[u8]) -> Self {
+    pub fn new(rom: &[u8], exception_sender: Sender<Exception>) -> Self {
         let mut this = Self {
             // HACK: allocate directly on the heap to avoid a stack overflow
             //       at runtime while trying to move around a 64MB array
@@ -44,6 +45,7 @@ impl MemoryInner {
             mmu_enabled: Box::from(false),
             tlb: Box::from(HashMap::with_capacity(1024)),
             paging_directory_address: Box::from(0x00000000),
+            exception_sender,
         };
         this.rom.as_mut_slice().write(rom).expect("failed to copy ROM to memory");
         this
@@ -60,8 +62,8 @@ unsafe impl Send for Memory {}
 unsafe impl Sync for Memory {}
 
 impl Memory {
-    pub fn new(rom: &[u8]) -> Self {
-        Self(Arc::new(UnsafeCell::new(MemoryInner::new(rom))))
+    pub fn new(rom: &[u8], exception_sender: Sender<Exception>) -> Self {
+        Self(Arc::new(UnsafeCell::new(MemoryInner::new(rom, exception_sender))))
     }
 
     fn inner(&self) -> &mut MemoryInner {
@@ -73,6 +75,7 @@ impl Memory {
     pub fn mmu_enabled(&self) -> &mut bool { &mut self.inner().mmu_enabled }
     pub fn tlb(&self) -> &mut HashMap<u32, MemoryPage> { &mut self.inner().tlb }
     pub fn paging_directory_address(&self) -> &mut u32 { &mut self.inner().paging_directory_address }
+    pub fn exception_sender(&self) -> &mut Sender<Exception> { &mut self.inner().exception_sender }
 
     pub fn dump(&self) {
         let mut file = File::create("memory.dump").expect("failed to open memory dump file");
@@ -212,26 +215,45 @@ impl Memory {
         )
     }
 
-    pub fn read_8(&mut self, onfault: &JumpEnv<Exception>, address: u32) -> u8 {
-        self.read_opt_8(address).unwrap_or_else(|| unsafe { longjmp(onfault, Exception::PageFaultRead(address)) })
+    pub fn read_8(&mut self, address: u32) -> Option<u8> {
+        let mut read_ok = true;
+        let value = self.read_opt_8(address).unwrap_or_else(|| { read_ok = false; 0 });
+        if read_ok {
+            Some(value)
+        } else {
+            self.exception_sender().send(Exception::PageFaultRead(address)).unwrap();
+            None
+        }
     }
-    pub fn read_16(&mut self, onfault: &JumpEnv<Exception>, address: u32) -> u16 {
-        (self.read_opt_8(address).unwrap_or_else(|| unsafe { longjmp(onfault, Exception::PageFaultRead(address)) }) as u16) |
-        (self.read_opt_8(address + 1).unwrap_or_else(|| unsafe { longjmp(onfault, Exception::PageFaultRead(address + 1)) }) as u16) << 8
+    pub fn read_16(&mut self, address: u32) -> Option<u16> {
+        let mut read_ok = true;
+        let value = self.read_8(address).unwrap_or_else(|| { read_ok = false; 0 }) as u16 |
+                    (self.read_8(address + 1).unwrap_or_else(|| { read_ok = false; 0 }) as u16) << 8;
+        if read_ok {
+            Some(value)
+        } else {
+            None
+        }
     }
-    pub fn read_32(&mut self, onfault: &JumpEnv<Exception>, address: u32) -> u32 {
-        (self.read_opt_8(address).unwrap_or_else(|| unsafe { longjmp(onfault, Exception::PageFaultRead(address)) }) as u32) |
-        (self.read_opt_8(address + 1).unwrap_or_else(|| unsafe { longjmp(onfault, Exception::PageFaultRead(address + 1)) }) as u32) <<  8 |
-        (self.read_opt_8(address + 2).unwrap_or_else(|| unsafe { longjmp(onfault, Exception::PageFaultRead(address + 2)) }) as u32) << 16 |
-        (self.read_opt_8(address + 3).unwrap_or_else(|| unsafe { longjmp(onfault, Exception::PageFaultRead(address + 3)) }) as u32) << 24
+    pub fn read_32(&mut self, address: u32) -> Option<u32> {
+        let mut read_ok = true;
+        let value = self.read_8(address).unwrap_or_else(|| { read_ok = false; 0 }) as u32 |
+                    (self.read_8(address + 1).unwrap_or_else(|| { read_ok = false; 0 }) as u32) <<  8 |
+                    (self.read_8(address + 2).unwrap_or_else(|| { read_ok = false; 0 }) as u32) << 16 |
+                    (self.read_8(address + 3).unwrap_or_else(|| { read_ok = false; 0 }) as u32) << 24;
+        if read_ok {
+            Some(value)
+        } else {
+            None
+        }
     }
 
-    pub fn write_8(&mut self, onfault: &JumpEnv<Exception>, mut address: u32, byte: u8) {
+    pub fn write_8(&mut self, mut address: u32, byte: u8) -> Option<()> {
         let original_address = address;
         let mut writable = true;
         if *self.mmu_enabled() {
             (address, writable) = self.virtual_to_physical(address as u32).unwrap_or_else(|| {
-                unsafe { longjmp(onfault, Exception::PageFaultWrite(original_address)) }
+                (0, false)
             });
         }
 
@@ -247,21 +269,33 @@ impl Memory {
                     *value = byte;
                 }
                 None => {
-                    unsafe { longjmp(onfault, Exception::PageFaultWrite(original_address)) }
+                    self.exception_sender().send(Exception::PageFaultWrite(original_address)).unwrap();
                 }
             }
+            Some(())
         } else {
-            unsafe { longjmp(onfault, Exception::PageFaultWrite(original_address)) }
+            self.exception_sender().send(Exception::PageFaultWrite(original_address)).unwrap();
+            None
         }
     }
-    pub fn write_16(&mut self, onfault: &JumpEnv<Exception>, address: u32, half: u16) {
-        self.write_8(onfault, address, (half & 0x00FF) as u8);
-        self.write_8(onfault, address + 1, (half >> 8) as u8);
+    pub fn write_16(&mut self, address: u32, half: u16) -> Option<()> {
+        let result_0 = self.write_8(address, (half & 0x00FF) as u8);
+        let result_1 = self.write_8(address + 1, (half >> 8) as u8);
+        if let (Some(_), Some(_)) = (result_0, result_1) {
+            Some(())
+        } else {
+            None
+        }
     }
-    pub fn write_32(&mut self, onfault: &JumpEnv<Exception>, address: u32, word: u32) {
-        self.write_8(onfault, address, (word & 0x000000FF) as u8);
-        self.write_8(onfault, address + 1, ((word & 0x0000FF00) >>  8) as u8);
-        self.write_8(onfault, address + 2, ((word & 0x00FF0000) >> 16) as u8);
-        self.write_8(onfault, address + 3, ((word & 0xFF000000) >> 24) as u8);
+    pub fn write_32(&mut self, address: u32, word: u32) -> Option<()> {
+        let result_0 = self.write_8(address, (word & 0x000000FF) as u8);
+        let result_1 = self.write_8(address + 1, ((word & 0x0000FF00) >>  8) as u8);
+        let result_2 = self.write_8(address + 2, ((word & 0x00FF0000) >> 16) as u8);
+        let result_3 = self.write_8(address + 3, ((word & 0xFF000000) >> 24) as u8);
+        if let (Some(_), Some(_), Some(_), Some(_)) = (result_0, result_1, result_2, result_3) {
+            Some(())
+        } else {
+            None
+        }
     }
 }

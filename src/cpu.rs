@@ -4,7 +4,6 @@
 //       move this up to match all of the other ones (or move all of the other ones down, which would probably be better anyways)
 
 use crate::Bus;
-use crate::setjmp::{JumpEnv, setjmp};
 
 const DEBUG: bool = false;
 
@@ -59,8 +58,6 @@ pub struct Cpu {
     pub halted: bool,
 
     pub bus: Bus,
-
-    pub onfault: JumpEnv<Exception>,
 }
 
 impl Cpu {
@@ -73,11 +70,7 @@ impl Cpu {
             flag: Flag { swap_sp: false, interrupt: false, carry: false, zero: false },
             halted: false,
             bus,
-            onfault: JumpEnv::new(),
         }
-    }
-    pub unsafe fn setjmp(&self) -> Option<Exception> {
-        setjmp(&self.onfault)
     }
     fn check_condition(&self, condition: Condition) -> bool {
         match condition {
@@ -93,53 +86,53 @@ impl Cpu {
     fn relative_to_absolute(&self, relative_address: u32) -> u32 {
         self.instruction_pointer.wrapping_add(relative_address)
     }
-    fn read_source(&mut self, source: Operand) -> (u32, u32) {
+    fn read_source(&mut self, source: Operand) -> Option<(u32, u32)> {
         let mut instruction_pointer_offset = 2; // increment past opcode half
         let source_value = match source {
             Operand::Register => {
-                let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                 let value = self.read_register(register);
                 instruction_pointer_offset += 1; // increment past 8 bit register number
                 value
             }
             Operand::RegisterPtr(size) => {
-                let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                 let pointer = self.read_register(register);
                 let value = match size {
-                    Size::Byte => self.bus.memory.read_8(&self.onfault, pointer) as u32,
-                    Size::Half => self.bus.memory.read_16(&self.onfault, pointer) as u32,
-                    Size::Word => self.bus.memory.read_32(&self.onfault, pointer),
+                    Size::Byte => self.bus.memory.read_8(pointer)? as u32,
+                    Size::Half => self.bus.memory.read_16(pointer)? as u32,
+                    Size::Word => self.bus.memory.read_32(pointer)?,
                 };
                 instruction_pointer_offset += 1; // increment past 8 bit register number
                 value
             }
             Operand::Immediate8 => {
-                let value = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                let value = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                 instruction_pointer_offset += 1; // increment past 8 bit immediate
                 value as u32
             }
             Operand::Immediate16 => {
-                let value = self.bus.memory.read_16(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                let value = self.bus.memory.read_16(self.instruction_pointer + instruction_pointer_offset)?;
                 instruction_pointer_offset += 2; // increment past 16 bit immediate
                 value as u32
             }
             Operand::Immediate32 => {
-                let value = self.bus.memory.read_32(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                let value = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset)?;
                 instruction_pointer_offset += 4; // increment past 32 bit immediate
                 value
             }
             Operand::ImmediatePtr(size) => {
-                let pointer = self.bus.memory.read_32(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset)?;
                 let value = match size {
-                    Size::Byte => self.bus.memory.read_8(&self.onfault, pointer) as u32,
-                    Size::Half => self.bus.memory.read_16(&self.onfault, pointer) as u32,
-                    Size::Word => self.bus.memory.read_32(&self.onfault, pointer),
+                    Size::Byte => self.bus.memory.read_8(pointer)? as u32,
+                    Size::Half => self.bus.memory.read_16(pointer)? as u32,
+                    Size::Word => self.bus.memory.read_32(pointer)?,
                 };
                 instruction_pointer_offset += 4; // increment past 32 bit pointer
                 value
             }
         };
-        (source_value, instruction_pointer_offset)
+        Some((source_value, instruction_pointer_offset))
     }
     pub fn read_register(&self, register: u8) -> u32 {
         match register {
@@ -174,40 +167,58 @@ impl Cpu {
                 index + 24, self.register[index + 24]
             );
         }
-        println!("rsp: {:#010X} | esp: {:#010X}", self.stack_pointer, self.exception_stack_pointer);
+        println!("rsp: {:#010X} | resp: {:#010X}", self.stack_pointer, self.exception_stack_pointer);
     }
     pub fn push_stack_8(&mut self, byte: u8) {
         let decremented_stack_pointer = self.stack_pointer.overflowing_sub(1);
-        self.stack_pointer = decremented_stack_pointer.0;
-        self.bus.memory.write_8(&self.onfault, self.stack_pointer, byte);
+        if let Some(_) = self.bus.memory.write_8(decremented_stack_pointer.0, byte) {
+            self.stack_pointer = decremented_stack_pointer.0;
+        }
     }
-    pub fn pop_stack_8(&mut self) -> u8 {
-        let byte = self.bus.memory.read_8(&self.onfault, self.stack_pointer);
-        let incremented_stack_pointer = self.stack_pointer.overflowing_add(1);
-        self.stack_pointer = incremented_stack_pointer.0;
-        byte
+    pub fn pop_stack_8(&mut self) -> Option<u8> {
+        let byte = self.bus.memory.read_8(self.stack_pointer);
+        match byte {
+            Some(byte) => {
+                let incremented_stack_pointer = self.stack_pointer.overflowing_add(1);
+                self.stack_pointer = incremented_stack_pointer.0;
+                Some(byte)
+            },
+            None => None,
+        }
     }
     pub fn push_stack_16(&mut self, half: u16) {
         let decremented_stack_pointer = self.stack_pointer.overflowing_sub(2);
-        self.stack_pointer = decremented_stack_pointer.0;
-        self.bus.memory.write_16(&self.onfault, self.stack_pointer, half);
+        if let Some(_) = self.bus.memory.write_16(decremented_stack_pointer.0, half) {
+            self.stack_pointer = decremented_stack_pointer.0;
+        }
     }
-    pub fn pop_stack_16(&mut self) -> u16 {
-        let half = self.bus.memory.read_16(&self.onfault, self.stack_pointer);
-        let incremented_stack_pointer = self.stack_pointer.overflowing_add(2);
-        self.stack_pointer = incremented_stack_pointer.0;
-        half
+    pub fn pop_stack_16(&mut self) -> Option<u16> {
+        let half = self.bus.memory.read_16(self.stack_pointer);
+        match half {
+            Some(half) => {
+                let incremented_stack_pointer = self.stack_pointer.overflowing_add(2);
+                self.stack_pointer = incremented_stack_pointer.0;
+                Some(half)
+            },
+            None => None,
+        }
     }
     pub fn push_stack_32(&mut self, word: u32) {
         let decremented_stack_pointer = self.stack_pointer.overflowing_sub(4);
-        self.stack_pointer = decremented_stack_pointer.0;
-        self.bus.memory.write_32(&self.onfault, self.stack_pointer, word);
+        if let Some(_) = self.bus.memory.write_32(decremented_stack_pointer.0, word) {
+            self.stack_pointer = decremented_stack_pointer.0;
+        }
     }
-    pub fn pop_stack_32(&mut self) -> u32 {
-        let word = self.bus.memory.read_32(&self.onfault, self.stack_pointer);
-        let incremented_stack_pointer = self.stack_pointer.overflowing_add(4);
-        self.stack_pointer = incremented_stack_pointer.0;
-        word
+    pub fn pop_stack_32(&mut self) -> Option<u32> {
+        let word = self.bus.memory.read_32(self.stack_pointer);
+        match word {
+            Some(word) => {
+                let incremented_stack_pointer = self.stack_pointer.overflowing_add(4);
+                self.stack_pointer = incremented_stack_pointer.0;
+                Some(word)
+            },
+            None => None,
+        }
     }
     pub fn interrupt(&mut self, interrupt: Interrupt) {
         if DEBUG { println!("interrupt(): enabled: {}", self.flag.interrupt); }
@@ -246,7 +257,11 @@ impl Cpu {
 
         let old_mmu_state = *self.bus.memory.mmu_enabled();
         *self.bus.memory.mmu_enabled() = false;
-        let address = self.bus.memory.read_32(&self.onfault, address_of_pointer);
+        let address_maybe = self.bus.memory.read_32(address_of_pointer);
+        if address_maybe == None {
+            return;
+        }
+        let address = address_maybe.unwrap();
         *self.bus.memory.mmu_enabled() = old_mmu_state;
 
         if self.flag.swap_sp {
@@ -270,7 +285,11 @@ impl Cpu {
 
         let old_mmu_state = *self.bus.memory.mmu_enabled();
         *self.bus.memory.mmu_enabled() = false;
-        let address = self.bus.memory.read_32(&self.onfault, address_of_pointer);
+        let address_maybe = self.bus.memory.read_32(address_of_pointer);
+        if address_maybe == None {
+            return;
+        }
+        let address = address_maybe.unwrap();
         *self.bus.memory.mmu_enabled() = old_mmu_state;
 
         if self.flag.swap_sp {
@@ -294,11 +313,20 @@ impl Cpu {
     }
     // execute instruction from memory at the current instruction pointer
     pub fn execute_memory_instruction(&mut self) {
-        let opcode = self.bus.memory.read_16(&self.onfault, self.instruction_pointer);
+        let opcode_maybe = self.bus.memory.read_16(self.instruction_pointer);
+        if opcode_maybe == None {
+            return;
+        }
+        let opcode = opcode_maybe.unwrap();
 
         if let Some(instruction) = Instruction::from_half(opcode) {
             if DEBUG { println!("{:#010X}: {:?}", self.instruction_pointer, instruction); }
-            self.instruction_pointer = self.execute_instruction(instruction);
+            let next_instruction_pointer = self.execute_instruction(instruction);
+            if let Some(next) = next_instruction_pointer {
+                self.instruction_pointer = next;
+            } else {
+                println!("next instruction pointer is None!")
+            }
         } else {
             let size = ((opcode & 0b1100000000000000) >> 14) as u8;
             let instruction = ((opcode & 0b0011111100000000) >> 8) as u8;
@@ -316,10 +344,10 @@ impl Cpu {
         }
     }
     // execute one instruction and return the next instruction pointer value
-    fn execute_instruction(&mut self, instruction: Instruction) -> u32 {
+    fn execute_instruction(&mut self, instruction: Instruction) -> Option<u32> {
         match instruction {
             Instruction::Nop() => {
-                self.instruction_pointer + 2 // increment past opcode half
+                Some(self.instruction_pointer + 2) // increment past opcode half
             }
             Instruction::Halt(condition) => {
                 let instruction_pointer_offset = 2; // increment past opcode half
@@ -328,7 +356,7 @@ impl Cpu {
                     self.halted = true;
                     //if DEBUG { self.print_registers(); }
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
             Instruction::Brk(condition) => {
                 let instruction_pointer_offset = 2; // increment past opcode half
@@ -338,15 +366,15 @@ impl Cpu {
                     println!("Breakpoint reached");
                     self.print_registers();
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
 
             Instruction::Add(size, condition, destination, source) => {
-                let (source_value, mut instruction_pointer_offset) = self.read_source(source);
+                let (source_value, mut instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
                                 if should_run {
@@ -376,29 +404,29 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr(_) => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer).overflowing_add(source_value as u8);
+                                let result = self.bus.memory.read_8(pointer)?.overflowing_add(source_value as u8);
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result.0);
+                                    self.bus.memory.write_8(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer).overflowing_add(source_value as u16);
+                                let result = self.bus.memory.read_16(pointer)?.overflowing_add(source_value as u16);
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result.0);
+                                    self.bus.memory.write_16(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer).overflowing_add(source_value);
+                                let result = self.bus.memory.read_32(pointer)?.overflowing_add(source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result.0);
+                                    self.bus.memory.write_32(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -407,28 +435,28 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::ImmediatePtr(_) => {
-                        let pointer = self.bus.memory.read_32(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer).overflowing_add(source_value as u8);
+                                let result = self.bus.memory.read_8(pointer)?.overflowing_add(source_value as u8);
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result.0);
+                                    self.bus.memory.write_8(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer).overflowing_add(source_value as u16);
+                                let result = self.bus.memory.read_16(pointer)?.overflowing_add(source_value as u16);
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result.0);
+                                    self.bus.memory.write_16(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer).overflowing_add(source_value);
+                                let result = self.bus.memory.read_32(pointer)?.overflowing_add(source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result.0);
+                                    self.bus.memory.write_32(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -438,14 +466,14 @@ impl Cpu {
                     }
                     _ => panic!("Attempting to use an immediate value as a destination"),
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
             Instruction::Inc(size, condition, source) => {
                 let mut instruction_pointer_offset = 2; // increment past opcode half
                 let should_run = self.check_condition(condition);
                 match source {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
                                 if should_run {
@@ -475,29 +503,29 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr(_) => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    let result = self.bus.memory.read_8(&self.onfault, pointer).overflowing_add(1);
-                                    self.bus.memory.write_8(&self.onfault, pointer, result.0);
+                                    let result = self.bus.memory.read_8(pointer)?.overflowing_add(1);
+                                    self.bus.memory.write_8(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    let result = self.bus.memory.read_16(&self.onfault, pointer).overflowing_add(1);
-                                    self.bus.memory.write_16(&self.onfault, pointer, result.0);
+                                    let result = self.bus.memory.read_16(pointer)?.overflowing_add(1);
+                                    self.bus.memory.write_16(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    let result = self.bus.memory.read_32(&self.onfault, pointer).overflowing_add(1);
-                                    self.bus.memory.write_32(&self.onfault, pointer, result.0);
+                                    let result = self.bus.memory.read_32(pointer)?.overflowing_add(1);
+                                    self.bus.memory.write_32(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -506,28 +534,28 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::ImmediatePtr(_) => {
-                        let pointer = self.bus.memory.read_32(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    let result = self.bus.memory.read_8(&self.onfault, pointer).overflowing_add(1);
-                                    self.bus.memory.write_8(&self.onfault, pointer, result.0);
+                                    let result = self.bus.memory.read_8(pointer)?.overflowing_add(1);
+                                    self.bus.memory.write_8(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    let result = self.bus.memory.read_16(&self.onfault, pointer).overflowing_add(1);
-                                    self.bus.memory.write_16(&self.onfault, pointer, result.0);
+                                    let result = self.bus.memory.read_16(pointer)?.overflowing_add(1);
+                                    self.bus.memory.write_16(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    let result = self.bus.memory.read_32(&self.onfault, pointer).overflowing_add(1);
-                                    self.bus.memory.write_32(&self.onfault, pointer, result.0);
+                                    let result = self.bus.memory.read_32(pointer)?.overflowing_add(1);
+                                    self.bus.memory.write_32(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -537,14 +565,14 @@ impl Cpu {
                     }
                     _ => panic!("Attempting to use an immediate value as a destination"),
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
             Instruction::Sub(size, condition, destination, source) => {
-                let (source_value, mut instruction_pointer_offset) = self.read_source(source);
+                let (source_value, mut instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
                                 if should_run {
@@ -574,29 +602,29 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr(_) => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer).overflowing_sub(source_value as u8);
+                                let result = self.bus.memory.read_8(pointer)?.overflowing_sub(source_value as u8);
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result.0);
+                                    self.bus.memory.write_8(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer).overflowing_sub(source_value as u16);
+                                let result = self.bus.memory.read_16(pointer)?.overflowing_sub(source_value as u16);
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result.0);
+                                    self.bus.memory.write_16(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer).overflowing_sub(source_value);
+                                let result = self.bus.memory.read_32(pointer)?.overflowing_sub(source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result.0);
+                                    self.bus.memory.write_32(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -605,28 +633,28 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::ImmediatePtr(_) => {
-                        let pointer = self.bus.memory.read_32(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer).overflowing_sub(source_value as u8);
+                                let result = self.bus.memory.read_8(pointer)?.overflowing_sub(source_value as u8);
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result.0);
+                                    self.bus.memory.write_8(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer).overflowing_sub(source_value as u16);
+                                let result = self.bus.memory.read_16(pointer)?.overflowing_sub(source_value as u16);
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result.0);
+                                    self.bus.memory.write_16(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer).overflowing_sub(source_value);
+                                let result = self.bus.memory.read_32(pointer)?.overflowing_sub(source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result.0);
+                                    self.bus.memory.write_32(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -636,14 +664,14 @@ impl Cpu {
                     }
                     _ => panic!("Attempting to use an immediate value as a destination"),
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
             Instruction::Dec(size, condition, source) => {
                 let mut instruction_pointer_offset = 2; // increment past opcode half
                 let should_run = self.check_condition(condition);
                 match source {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
                                 if should_run {
@@ -673,29 +701,29 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr(_) => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    let result = self.bus.memory.read_8(&self.onfault, pointer).overflowing_sub(1);
-                                    self.bus.memory.write_8(&self.onfault, pointer, result.0);
+                                    let result = self.bus.memory.read_8(pointer)?.overflowing_sub(1);
+                                    self.bus.memory.write_8(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    let result = self.bus.memory.read_16(&self.onfault, pointer).overflowing_sub(1);
-                                    self.bus.memory.write_16(&self.onfault, pointer, result.0);
+                                    let result = self.bus.memory.read_16(pointer)?.overflowing_sub(1);
+                                    self.bus.memory.write_16(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    let result = self.bus.memory.read_32(&self.onfault, pointer).overflowing_sub(1);
-                                    self.bus.memory.write_32(&self.onfault, pointer, result.0);
+                                    let result = self.bus.memory.read_32(pointer)?.overflowing_sub(1);
+                                    self.bus.memory.write_32(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -704,28 +732,28 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::ImmediatePtr(_) => {
-                        let pointer = self.bus.memory.read_32(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    let result = self.bus.memory.read_8(&self.onfault, pointer).overflowing_sub(1);
-                                    self.bus.memory.write_8(&self.onfault, pointer, result.0);
+                                    let result = self.bus.memory.read_8(pointer)?.overflowing_sub(1);
+                                    self.bus.memory.write_8(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    let result = self.bus.memory.read_16(&self.onfault, pointer).overflowing_sub(1);
-                                    self.bus.memory.write_16(&self.onfault, pointer, result.0);
+                                    let result = self.bus.memory.read_16(pointer)?.overflowing_sub(1);
+                                    self.bus.memory.write_16(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    let result = self.bus.memory.read_32(&self.onfault, pointer).overflowing_sub(1);
-                                    self.bus.memory.write_32(&self.onfault, pointer, result.0);
+                                    let result = self.bus.memory.read_32(pointer)?.overflowing_sub(1);
+                                    self.bus.memory.write_32(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -735,14 +763,14 @@ impl Cpu {
                     }
                     _ => panic!("Attempting to use an immediate value as a destination"),
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
             Instruction::Mul(size, condition, destination, source) => {
-                let (source_value, mut instruction_pointer_offset) = self.read_source(source);
+                let (source_value, mut instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
                                 if should_run {
@@ -772,29 +800,29 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr(_) => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer).overflowing_mul(source_value as u8);
+                                let result = self.bus.memory.read_8(pointer)?.overflowing_mul(source_value as u8);
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result.0);
+                                    self.bus.memory.write_8(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer).overflowing_mul(source_value as u16);
+                                let result = self.bus.memory.read_16(pointer)?.overflowing_mul(source_value as u16);
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result.0);
+                                    self.bus.memory.write_16(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer).overflowing_mul(source_value);
+                                let result = self.bus.memory.read_32(pointer)?.overflowing_mul(source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result.0);
+                                    self.bus.memory.write_32(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -803,28 +831,28 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::ImmediatePtr(_) => {
-                        let pointer = self.bus.memory.read_32(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer).overflowing_mul(source_value as u8);
+                                let result = self.bus.memory.read_8(pointer)?.overflowing_mul(source_value as u8);
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result.0);
+                                    self.bus.memory.write_8(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer).overflowing_mul(source_value as u16);
+                                let result = self.bus.memory.read_16(pointer)?.overflowing_mul(source_value as u16);
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result.0);
+                                    self.bus.memory.write_16(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer).overflowing_mul(source_value);
+                                let result = self.bus.memory.read_32(pointer)?.overflowing_mul(source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result.0);
+                                    self.bus.memory.write_32(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
@@ -834,14 +862,14 @@ impl Cpu {
                     }
                     _ => panic!("Attempting to use an immediate value as a destination"),
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
             Instruction::Div(size, condition, destination, source) => {
-                let (source_value, mut instruction_pointer_offset) = self.read_source(source);
+                let (source_value, mut instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
                                 if should_run {
@@ -868,27 +896,27 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr(_) => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer).overflowing_div(source_value as u8);
+                                let result = self.bus.memory.read_8(pointer)?.overflowing_div(source_value as u8);
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result.0);
+                                    self.bus.memory.write_8(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer).overflowing_div(source_value as u16);
+                                let result = self.bus.memory.read_16(pointer)?.overflowing_div(source_value as u16);
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result.0);
+                                    self.bus.memory.write_16(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer).overflowing_div(source_value);
+                                let result = self.bus.memory.read_32(pointer)?.overflowing_div(source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result.0);
+                                    self.bus.memory.write_32(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                 }
                             }
@@ -896,26 +924,26 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::ImmediatePtr(_) => {
-                        let pointer = self.bus.memory.read_32(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer).overflowing_div(source_value as u8);
+                                let result = self.bus.memory.read_8(pointer)?.overflowing_div(source_value as u8);
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result.0);
+                                    self.bus.memory.write_8(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer).overflowing_div(source_value as u16);
+                                let result = self.bus.memory.read_16(pointer)?.overflowing_div(source_value as u16);
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result.0);
+                                    self.bus.memory.write_16(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer).overflowing_div(source_value);
+                                let result = self.bus.memory.read_32(pointer)?.overflowing_div(source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result.0);
+                                    self.bus.memory.write_32(pointer, result.0)?;
                                     self.flag.zero = result.0 == 0;
                                 }
                             }
@@ -924,14 +952,14 @@ impl Cpu {
                     }
                     _ => panic!("Attempting to use an immediate value as a destination"),
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
             Instruction::Rem(size, condition, destination, source) => {
-                let (source_value, mut instruction_pointer_offset) = self.read_source(source);
+                let (source_value, mut instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
                                 if should_run {
@@ -958,27 +986,27 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr(_) => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer) % source_value as u8;
+                                let result = self.bus.memory.read_8(pointer)? % source_value as u8;
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result);
+                                    self.bus.memory.write_8(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer) % source_value as u16;
+                                let result = self.bus.memory.read_16(pointer)? % source_value as u16;
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result);
+                                    self.bus.memory.write_16(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer) % source_value;
+                                let result = self.bus.memory.read_32(pointer)? % source_value;
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result);
+                                    self.bus.memory.write_32(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
@@ -986,26 +1014,26 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::ImmediatePtr(_) => {
-                        let pointer = self.bus.memory.read_32(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer) % source_value as u8;
+                                let result = self.bus.memory.read_8(pointer)? % source_value as u8;
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result);
+                                    self.bus.memory.write_8(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer) % source_value as u16;
+                                let result = self.bus.memory.read_16(pointer)? % source_value as u16;
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result);
+                                    self.bus.memory.write_16(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer) % source_value;
+                                let result = self.bus.memory.read_32(pointer)? % source_value;
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result);
+                                    self.bus.memory.write_32(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
@@ -1014,15 +1042,15 @@ impl Cpu {
                     }
                     _ => panic!("Attempting to use an immediate value as a destination"),
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
 
             Instruction::And(size, condition, destination, source) => {
-                let (source_value, mut instruction_pointer_offset) = self.read_source(source);
+                let (source_value, mut instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
                                 if should_run {
@@ -1049,27 +1077,27 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr(_) => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer) & source_value as u8;
+                                let result = self.bus.memory.read_8(pointer)? & source_value as u8;
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result);
+                                    self.bus.memory.write_8(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer) & source_value as u16;
+                                let result = self.bus.memory.read_16(pointer)? & source_value as u16;
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result);
+                                    self.bus.memory.write_16(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer) & source_value;
+                                let result = self.bus.memory.read_32(pointer)? & source_value;
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result);
+                                    self.bus.memory.write_32(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
@@ -1077,26 +1105,26 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::ImmediatePtr(_) => {
-                        let pointer = self.bus.memory.read_32(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer) & source_value as u8;
+                                let result = self.bus.memory.read_8(pointer)? & source_value as u8;
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result);
+                                    self.bus.memory.write_8(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer) & source_value as u16;
+                                let result = self.bus.memory.read_16(pointer)? & source_value as u16;
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result);
+                                    self.bus.memory.write_16(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer) & source_value;
+                                let result = self.bus.memory.read_32(pointer)? & source_value;
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result);
+                                    self.bus.memory.write_32(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
@@ -1105,14 +1133,14 @@ impl Cpu {
                     }
                     _ => panic!("Attempting to use an immediate value as a destination"),
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
             Instruction::Or(size, condition, destination, source) => {
-                let (source_value, mut instruction_pointer_offset) = self.read_source(source);
+                let (source_value, mut instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
                                 if should_run {
@@ -1139,27 +1167,27 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr(_) => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer) | source_value as u8;
+                                let result = self.bus.memory.read_8(pointer)? | source_value as u8;
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result);
+                                    self.bus.memory.write_8(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer) | source_value as u16;
+                                let result = self.bus.memory.read_16(pointer)? | source_value as u16;
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result);
+                                    self.bus.memory.write_16(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer) | source_value;
+                                let result = self.bus.memory.read_32(pointer)? | source_value;
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result);
+                                    self.bus.memory.write_32(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
@@ -1167,26 +1195,26 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::ImmediatePtr(_) => {
-                        let pointer = self.bus.memory.read_32(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer) | source_value as u8;
+                                let result = self.bus.memory.read_8(pointer)? | source_value as u8;
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result);
+                                    self.bus.memory.write_8(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer) | source_value as u16;
+                                let result = self.bus.memory.read_16(pointer)? | source_value as u16;
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result);
+                                    self.bus.memory.write_16(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer) | source_value;
+                                let result = self.bus.memory.read_32(pointer)? | source_value;
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result);
+                                    self.bus.memory.write_32(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
@@ -1195,14 +1223,14 @@ impl Cpu {
                     }
                     _ => panic!("Attempting to use an immediate value as a destination"),
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
             Instruction::Xor(size, condition, destination, source) => {
-                let (source_value, mut instruction_pointer_offset) = self.read_source(source);
+                let (source_value, mut instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
                                 if should_run {
@@ -1229,27 +1257,27 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr(_) => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer) ^ source_value as u8;
+                                let result = self.bus.memory.read_8(pointer)? ^ source_value as u8;
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result);
+                                    self.bus.memory.write_8(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer) ^ source_value as u16;
+                                let result = self.bus.memory.read_16(pointer)? ^ source_value as u16;
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result);
+                                    self.bus.memory.write_16(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer) ^ source_value;
+                                let result = self.bus.memory.read_32(pointer)? ^ source_value;
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result);
+                                    self.bus.memory.write_32(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
@@ -1257,26 +1285,26 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::ImmediatePtr(_) => {
-                        let pointer = self.bus.memory.read_32(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer) ^ source_value as u8;
+                                let result = self.bus.memory.read_8(pointer)? ^ source_value as u8;
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result);
+                                    self.bus.memory.write_8(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer) ^ source_value as u16;
+                                let result = self.bus.memory.read_16(pointer)? ^ source_value as u16;
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result);
+                                    self.bus.memory.write_16(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer) ^ source_value;
+                                let result = self.bus.memory.read_32(pointer)? ^ source_value;
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result);
+                                    self.bus.memory.write_32(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
@@ -1285,14 +1313,14 @@ impl Cpu {
                     }
                     _ => panic!("Attempting to use an immediate value as a destination"),
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
             Instruction::Not(size, condition, source) => {
                 let mut instruction_pointer_offset = 2; // increment past opcode half
                 let should_run = self.check_condition(condition);
                 match source {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
                                 if should_run {
@@ -1319,27 +1347,27 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr(_) => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
-                                let result =!self.bus.memory.read_8(&self.onfault, pointer);
+                                let result =!self.bus.memory.read_8(pointer)?;
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result);
+                                    self.bus.memory.write_8(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Half => {
-                                let result = !self.bus.memory.read_16(&self.onfault, pointer);
+                                let result = !self.bus.memory.read_16(pointer)?;
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result);
+                                    self.bus.memory.write_16(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Word => {
-                                let result = !self.bus.memory.read_32(&self.onfault, pointer);
+                                let result = !self.bus.memory.read_32(pointer)?;
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result);
+                                    self.bus.memory.write_32(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
@@ -1347,26 +1375,26 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::ImmediatePtr(_) => {
-                        let pointer = self.bus.memory.read_32(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
-                                let result = !self.bus.memory.read_8(&self.onfault, pointer);
+                                let result = !self.bus.memory.read_8(pointer)?;
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result);
+                                    self.bus.memory.write_8(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Half => {
-                                let result = !self.bus.memory.read_16(&self.onfault, pointer);
+                                let result = !self.bus.memory.read_16(pointer)?;
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result);
+                                    self.bus.memory.write_16(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
                             Size::Word => {
-                                let result = !self.bus.memory.read_32(&self.onfault, pointer);
+                                let result = !self.bus.memory.read_32(pointer)?;
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result);
+                                    self.bus.memory.write_32(pointer, result)?;
                                     self.flag.zero = result == 0;
                                 }
                             }
@@ -1375,14 +1403,14 @@ impl Cpu {
                     }
                     _ => panic!("Attempting to use an immediate value as a destination"),
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
             Instruction::Sla(size, condition, destination, source) => {
-                let (source_value, mut instruction_pointer_offset) = self.read_source(source);
+                let (source_value, mut instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
                                 if should_run {
@@ -1412,29 +1440,29 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr(_) => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer) << source_value;
+                                let result = self.bus.memory.read_8(pointer)? << source_value;
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result);
+                                    self.bus.memory.write_8(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 7) != 0;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer) << source_value;
+                                let result = self.bus.memory.read_16(pointer)? << source_value;
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result);
+                                    self.bus.memory.write_16(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 15) != 0;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer) << source_value;
+                                let result = self.bus.memory.read_32(pointer)? << source_value;
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result);
+                                    self.bus.memory.write_32(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 31) != 0;
                                 }
@@ -1443,28 +1471,28 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::ImmediatePtr(_) => {
-                        let pointer = self.bus.memory.read_32(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer) << source_value;
+                                let result = self.bus.memory.read_8(pointer)? << source_value;
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result);
+                                    self.bus.memory.write_8(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 7) != 0;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer) << source_value;
+                                let result = self.bus.memory.read_16(pointer)? << source_value;
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result);
+                                    self.bus.memory.write_16(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 15) != 0;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer) << source_value;
+                                let result = self.bus.memory.read_32(pointer)? << source_value;
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result);
+                                    self.bus.memory.write_32(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 31) != 0;
                                 }
@@ -1474,14 +1502,14 @@ impl Cpu {
                     }
                     _ => panic!("Attempting to use an immediate value as a destination"),
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
             Instruction::Sra(size, condition, destination, source) => {
-                let (source_value, mut instruction_pointer_offset) = self.read_source(source);
+                let (source_value, mut instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
                                 if should_run {
@@ -1511,29 +1539,29 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr(_) => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer) >> source_value as i32;
+                                let result = self.bus.memory.read_8(pointer)? >> source_value as i32;
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result);
+                                    self.bus.memory.write_8(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer) >> source_value as i32;
+                                let result = self.bus.memory.read_16(pointer)? >> source_value as i32;
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result);
+                                    self.bus.memory.write_16(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer) >> source_value as i32;
+                                let result = self.bus.memory.read_32(pointer)? >> source_value as i32;
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result);
+                                    self.bus.memory.write_32(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
@@ -1542,28 +1570,28 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::ImmediatePtr(_) => {
-                        let pointer = self.bus.memory.read_32(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer) >> source_value as i32;
+                                let result = self.bus.memory.read_8(pointer)? >> source_value as i32;
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result);
+                                    self.bus.memory.write_8(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer) >> source_value as i32;
+                                let result = self.bus.memory.read_16(pointer)? >> source_value as i32;
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result);
+                                    self.bus.memory.write_16(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer) >> source_value as i32;
+                                let result = self.bus.memory.read_32(pointer)? >> source_value as i32;
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result);
+                                    self.bus.memory.write_32(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
@@ -1573,14 +1601,14 @@ impl Cpu {
                     }
                     _ => panic!("Attempting to use an immediate value as a destination"),
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
             Instruction::Srl(size, condition, destination, source) => {
-                let (source_value, mut instruction_pointer_offset) = self.read_source(source);
+                let (source_value, mut instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
                                 if should_run {
@@ -1610,29 +1638,29 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr(_) => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer) >> source_value;
+                                let result = self.bus.memory.read_8(pointer)? >> source_value;
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result);
+                                    self.bus.memory.write_8(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer) >> source_value;
+                                let result = self.bus.memory.read_16(pointer)? >> source_value;
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result);
+                                    self.bus.memory.write_16(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer) >> source_value;
+                                let result = self.bus.memory.read_32(pointer)? >> source_value;
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result);
+                                    self.bus.memory.write_32(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
@@ -1641,28 +1669,28 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::ImmediatePtr(_) => {
-                        let pointer = self.bus.memory.read_32(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer) >> source_value;
+                                let result = self.bus.memory.read_8(pointer)? >> source_value;
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result);
+                                    self.bus.memory.write_8(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer) >> source_value;
+                                let result = self.bus.memory.read_16(pointer)? >> source_value;
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result);
+                                    self.bus.memory.write_16(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer) >> source_value;
+                                let result = self.bus.memory.read_32(pointer)? >> source_value;
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result);
+                                    self.bus.memory.write_32(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
@@ -1672,14 +1700,14 @@ impl Cpu {
                     }
                     _ => panic!("Attempting to use an immediate value as a destination"),
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
             Instruction::Rol(size, condition, destination, source) => {
-                let (source_value, mut instruction_pointer_offset) = self.read_source(source);
+                let (source_value, mut instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
                                 if should_run {
@@ -1709,29 +1737,29 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr(_) => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer).rotate_left(source_value);
+                                let result = self.bus.memory.read_8(pointer)?.rotate_left(source_value);
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result);
+                                    self.bus.memory.write_8(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 7) != 0;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer).rotate_left(source_value);
+                                let result = self.bus.memory.read_16(pointer)?.rotate_left(source_value);
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result);
+                                    self.bus.memory.write_16(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 15) != 0;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer).rotate_left(source_value);
+                                let result = self.bus.memory.read_32(pointer)?.rotate_left(source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result);
+                                    self.bus.memory.write_32(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 31) != 0;
                                 }
@@ -1740,28 +1768,28 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::ImmediatePtr(_) => {
-                        let pointer = self.bus.memory.read_32(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer).rotate_left(source_value);
+                                let result = self.bus.memory.read_8(pointer)?.rotate_left(source_value);
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result);
+                                    self.bus.memory.write_8(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 7) != 0;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer).rotate_left(source_value);
+                                let result = self.bus.memory.read_16(pointer)?.rotate_left(source_value);
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result);
+                                    self.bus.memory.write_16(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 15) != 0;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer).rotate_left(source_value);
+                                let result = self.bus.memory.read_32(pointer)?.rotate_left(source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result);
+                                    self.bus.memory.write_32(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 31) != 0;
                                 }
@@ -1771,14 +1799,14 @@ impl Cpu {
                     }
                     _ => panic!("Attempting to use an immediate value as a destination"),
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
             Instruction::Ror(size, condition, destination, source) => {
-                let (source_value, mut instruction_pointer_offset) = self.read_source(source);
+                let (source_value, mut instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
                                 if should_run {
@@ -1808,29 +1836,29 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr(_) => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer).rotate_right(source_value);
+                                let result = self.bus.memory.read_8(pointer)?.rotate_right(source_value);
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result);
+                                    self.bus.memory.write_8(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer).rotate_right(source_value);
+                                let result = self.bus.memory.read_16(pointer)?.rotate_right(source_value);
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result);
+                                    self.bus.memory.write_16(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer).rotate_right(source_value);
+                                let result = self.bus.memory.read_32(pointer)?.rotate_right(source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result);
+                                    self.bus.memory.write_32(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
@@ -1839,28 +1867,28 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::ImmediatePtr(_) => {
-                        let pointer = self.bus.memory.read_32(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer).rotate_right(source_value);
+                                let result = self.bus.memory.read_8(pointer)?.rotate_right(source_value);
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result);
+                                    self.bus.memory.write_8(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer).rotate_right(source_value);
+                                let result = self.bus.memory.read_16(pointer)?.rotate_right(source_value);
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result);
+                                    self.bus.memory.write_16(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer).rotate_right(source_value);
+                                let result = self.bus.memory.read_32(pointer)?.rotate_right(source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result);
+                                    self.bus.memory.write_32(pointer, result)?;
                                     self.flag.zero = result == 0;
                                     self.flag.carry = source_value & (1 << 0) != 0;
                                 }
@@ -1870,15 +1898,15 @@ impl Cpu {
                     }
                     _ => panic!("Attempting to use an immediate value as a destination"),
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
 
             Instruction::Bse(size, condition, destination, source) => {
-                let (source_value, mut instruction_pointer_offset) = self.read_source(source);
+                let (source_value, mut instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
                                 let result = self.read_register(register) as u8 | (1 << source_value);
@@ -1902,49 +1930,49 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr(_) => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer) | (1 << source_value);
+                                let result = self.bus.memory.read_8(pointer)? | (1 << source_value);
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result);
+                                    self.bus.memory.write_8(pointer, result)?;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer) | (1 << source_value);
+                                let result = self.bus.memory.read_16(pointer)? | (1 << source_value);
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result);
+                                    self.bus.memory.write_16(pointer, result)?;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer) | (1 << source_value);
+                                let result = self.bus.memory.read_32(pointer)? | (1 << source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result);
+                                    self.bus.memory.write_32(pointer, result)?;
                                 }
                             }
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::ImmediatePtr(_) => {
-                        let pointer = self.bus.memory.read_32(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer) | (1 << source_value);
+                                let result = self.bus.memory.read_8(pointer)? | (1 << source_value);
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result);
+                                    self.bus.memory.write_8(pointer, result)?;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer) | (1 << source_value);
+                                let result = self.bus.memory.read_16(pointer)? | (1 << source_value);
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result);
+                                    self.bus.memory.write_16(pointer, result)?;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer) | (1 << source_value);
+                                let result = self.bus.memory.read_32(pointer)? | (1 << source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result);
+                                    self.bus.memory.write_32(pointer, result)?;
                                 }
                             }
                         }
@@ -1952,14 +1980,14 @@ impl Cpu {
                     }
                     _ => panic!("Attempting to use an immediate value as a destination"),
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
             Instruction::Bcl(size, condition, destination, source) => {
-                let (source_value, mut instruction_pointer_offset) = self.read_source(source);
+                let (source_value, mut instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
                                 let result = self.read_register(register) as u8 & !(1 << source_value);
@@ -1983,49 +2011,49 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr(_) => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer) & !(1 << source_value);
+                                let result = self.bus.memory.read_8(pointer)? & !(1 << source_value);
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result);
+                                    self.bus.memory.write_8(pointer, result)?;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer) & !(1 << source_value);
+                                let result = self.bus.memory.read_16(pointer)? & !(1 << source_value);
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result);
+                                    self.bus.memory.write_16(pointer, result)?;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer) & !(1 << source_value);
+                                let result = self.bus.memory.read_32(pointer)? & !(1 << source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result);
+                                    self.bus.memory.write_32(pointer, result)?;
                                 }
                             }
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::ImmediatePtr(_) => {
-                        let pointer = self.bus.memory.read_32(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer) & !(1 << source_value);
+                                let result = self.bus.memory.read_8(pointer)? & !(1 << source_value);
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, result);
+                                    self.bus.memory.write_8(pointer, result)?;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer) & !(1 << source_value);
+                                let result = self.bus.memory.read_16(pointer)? & !(1 << source_value);
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, result);
+                                    self.bus.memory.write_16(pointer, result)?;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer) & !(1 << source_value);
+                                let result = self.bus.memory.read_32(pointer)? & !(1 << source_value);
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, result);
+                                    self.bus.memory.write_32(pointer, result)?;
                                 }
                             }
                         }
@@ -2033,14 +2061,14 @@ impl Cpu {
                     }
                     _ => panic!("Attempting to use an immediate value as a destination"),
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
             Instruction::Bts(size, condition, destination, source) => {
-                let (source_value, mut instruction_pointer_offset) = self.read_source(source);
+                let (source_value, mut instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
                                 let result = self.read_register(register) as u8 & (1 << source_value) == 0;
@@ -2064,23 +2092,23 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr(_) => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer) & (1 << source_value) == 0;
+                                let result = self.bus.memory.read_8(pointer)? & (1 << source_value) == 0;
                                 if should_run {
                                     self.flag.zero = result;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer) & (1 << source_value) == 0;
+                                let result = self.bus.memory.read_16(pointer)? & (1 << source_value) == 0;
                                 if should_run {
                                     self.flag.zero = result;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer) & (1 << source_value) == 0;
+                                let result = self.bus.memory.read_32(pointer)? & (1 << source_value) == 0;
                                 if should_run {
                                     self.flag.zero = result;
                                 }
@@ -2089,22 +2117,22 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::ImmediatePtr(_) => {
-                        let pointer = self.bus.memory.read_32(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer) & (1 << source_value) == 0;
+                                let result = self.bus.memory.read_8(pointer)? & (1 << source_value) == 0;
                                 if should_run {
                                     self.flag.zero = result;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer) & (1 << source_value) == 0;
+                                let result = self.bus.memory.read_16(pointer)? & (1 << source_value) == 0;
                                 if should_run {
                                     self.flag.zero = result;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer) & (1 << source_value) == 0;
+                                let result = self.bus.memory.read_32(pointer)? & (1 << source_value) == 0;
                                 if should_run {
                                     self.flag.zero = result;
                                 }
@@ -2114,15 +2142,15 @@ impl Cpu {
                     }
                     _ => panic!("Attempting to use an immediate value as a destination"),
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
 
             Instruction::Cmp(size, condition, destination, source) => {
-                let (source_value, mut instruction_pointer_offset) = self.read_source(source);
+                let (source_value, mut instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
                                 if should_run {
@@ -2149,25 +2177,25 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr(_) => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer).overflowing_sub(source_value as u8);
+                                let result = self.bus.memory.read_8(pointer)?.overflowing_sub(source_value as u8);
                                 if should_run {
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer).overflowing_sub(source_value as u16);
+                                let result = self.bus.memory.read_16(pointer)?.overflowing_sub(source_value as u16);
                                 if should_run {
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer).overflowing_sub(source_value);
+                                let result = self.bus.memory.read_32(pointer)?.overflowing_sub(source_value);
                                 if should_run {
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
@@ -2177,24 +2205,24 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::ImmediatePtr(_) => {
-                        let pointer = self.bus.memory.read_32(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
-                                let result = self.bus.memory.read_8(&self.onfault, pointer).overflowing_sub(source_value as u8);
+                                let result = self.bus.memory.read_8(pointer)?.overflowing_sub(source_value as u8);
                                 if should_run {
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Half => {
-                                let result = self.bus.memory.read_16(&self.onfault, pointer).overflowing_sub(source_value as u16);
+                                let result = self.bus.memory.read_16(pointer)?.overflowing_sub(source_value as u16);
                                 if should_run {
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
                                 }
                             }
                             Size::Word => {
-                                let result = self.bus.memory.read_32(&self.onfault, pointer).overflowing_sub(source_value);
+                                let result = self.bus.memory.read_32(pointer)?.overflowing_sub(source_value);
                                 if should_run {
                                     self.flag.zero = result.0 == 0;
                                     self.flag.carry = result.1;
@@ -2205,14 +2233,14 @@ impl Cpu {
                     }
                     _ => panic!("Attempting to use an immediate value as a destination"),
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
             Instruction::Mov(size, condition, destination, source) => {
-                let (source_value, mut instruction_pointer_offset) = self.read_source(source);
+                let (source_value, mut instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
                                 if should_run {
@@ -2233,43 +2261,43 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr(_) => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, source_value as u8);
+                                    self.bus.memory.write_8(pointer, source_value as u8)?;
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, source_value as u16);
+                                    self.bus.memory.write_16(pointer, source_value as u16)?;
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, source_value);
+                                    self.bus.memory.write_32(pointer, source_value)?;
                                 }
                             }
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::ImmediatePtr(_) => {
-                        let pointer = self.bus.memory.read_32(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    self.bus.memory.write_8(&self.onfault, pointer, source_value as u8);
+                                    self.bus.memory.write_8(pointer, source_value as u8)?;
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    self.bus.memory.write_16(&self.onfault, pointer, source_value as u16);
+                                    self.bus.memory.write_16(pointer, source_value as u16)?;
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    self.bus.memory.write_32(&self.onfault, pointer, source_value);
+                                    self.bus.memory.write_32(pointer, source_value)?;
                                 }
                             }
                         }
@@ -2277,14 +2305,14 @@ impl Cpu {
                     }
                     _ => panic!("Attempting to use an immediate value as a destination"),
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
             Instruction::Movz(size, condition, destination, source) => {
-                let (source_value, mut instruction_pointer_offset) = self.read_source(source);
+                let (source_value, mut instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
                                 if should_run {
@@ -2306,113 +2334,113 @@ impl Cpu {
                     }
                     _ => panic!("MOVZ only operates on registers"),
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
 
             Instruction::Jmp(condition, source) => {
-                let (source_value, instruction_pointer_offset) = self.read_source(source);
+                let (source_value, instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 if should_run {
-                    source_value
+                    Some(source_value)
                 } else {
-                    self.instruction_pointer + instruction_pointer_offset
+                    Some(self.instruction_pointer + instruction_pointer_offset)
                 }
             }
             Instruction::Call(condition, source) => {
-                let (source_value, instruction_pointer_offset) = self.read_source(source);
+                let (source_value, instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 if should_run {
                     self.push_stack_32(self.instruction_pointer + instruction_pointer_offset);
-                    source_value
+                    Some(source_value)
                 } else {
-                    self.instruction_pointer + instruction_pointer_offset
+                    Some(self.instruction_pointer + instruction_pointer_offset)
                 }
             }
             Instruction::Loop(condition, source) => {
-                let (source_value, instruction_pointer_offset) = self.read_source(source);
+                let (source_value, instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 let result = self.read_register(31).overflowing_sub(1);
                 self.write_register(31, result.0);
                 if should_run {
                     if result.0 != 0 {
-                        source_value
+                        Some(source_value)
                     } else {
-                        self.instruction_pointer + instruction_pointer_offset
+                        Some(self.instruction_pointer + instruction_pointer_offset)
                     }
                 } else {
-                    self.instruction_pointer + instruction_pointer_offset
+                    Some(self.instruction_pointer + instruction_pointer_offset)
                 }
             }
             Instruction::Rjmp(condition, source) => {
-                let (source_value, instruction_pointer_offset) = self.read_source(source);
+                let (source_value, instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 if should_run {
-                    self.relative_to_absolute(source_value)
+                    Some(self.relative_to_absolute(source_value))
                 } else {
-                    self.instruction_pointer + instruction_pointer_offset
+                    Some(self.instruction_pointer + instruction_pointer_offset)
                 }
             }
             Instruction::Rcall(condition, source) => {
-                let (source_value, instruction_pointer_offset) = self.read_source(source);
+                let (source_value, instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 if should_run {
                     self.push_stack_32(self.instruction_pointer + instruction_pointer_offset);
-                    self.relative_to_absolute(source_value)
+                    Some(self.relative_to_absolute(source_value))
                 } else {
-                    self.instruction_pointer + instruction_pointer_offset
+                    Some(self.instruction_pointer + instruction_pointer_offset)
                 }
             }
             Instruction::Rloop(condition, source) => {
-                let (source_value, instruction_pointer_offset) = self.read_source(source);
+                let (source_value, instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 let result = self.read_register(31).overflowing_sub(1);
                 self.write_register(31, result.0);
                 if should_run {
                     if result.0 != 0 {
-                        self.relative_to_absolute(source_value)
+                        Some(self.relative_to_absolute(source_value))
                     } else {
-                        self.instruction_pointer + instruction_pointer_offset
+                        Some(self.instruction_pointer + instruction_pointer_offset)
                     }
                 } else {
-                    self.instruction_pointer + instruction_pointer_offset
+                    Some(self.instruction_pointer + instruction_pointer_offset)
                 }
             }
 
             Instruction::Rta(condition, destination, source) => {
-                let (source_value, mut instruction_pointer_offset) = self.read_source(source);
+                let (source_value, mut instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         if should_run {
                             self.write_register(register, self.relative_to_absolute(source_value));
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr(_) => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         let pointer = self.relative_to_absolute(self.read_register(register));
                         if should_run {
                             // INFO: register contains a relative address instead of an absolute address
-                            self.bus.memory.write_32(&self.onfault, pointer, self.relative_to_absolute(source_value));
+                            self.bus.memory.write_32(pointer, self.relative_to_absolute(source_value))?;
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::ImmediatePtr(_) => {
-                        let word = self.bus.memory.read_32(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let word = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset)?;
                         let pointer = self.relative_to_absolute(word);
                         if should_run {
-                            self.bus.memory.write_32(&self.onfault, pointer, self.relative_to_absolute(source_value));
+                            self.bus.memory.write_32(pointer, self.relative_to_absolute(source_value))?;
                         }
                         instruction_pointer_offset += 4; // increment past 32 bit pointer
                     }
                     _ => panic!("Attempting to use an immediate value as a destination"),
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
 
             Instruction::Push(size, condition, source) => {
-                let (source_value, instruction_pointer_offset) = self.read_source(source);
+                let (source_value, instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 match size {
                     Size::Byte => {
@@ -2431,30 +2459,30 @@ impl Cpu {
                         }
                     }
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
             Instruction::Pop(size, condition, source) => {
                 let mut instruction_pointer_offset = 2; // increment past opcode half
                 let should_run = self.check_condition(condition);
                 match source {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    let value = self.pop_stack_8() as u32;
+                                    let value = self.pop_stack_8()? as u32;
                                     self.write_register(register, (self.read_register(register) & 0xFFFFFF00) | value);
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    let value = self.pop_stack_16() as u32;
+                                    let value = self.pop_stack_16()? as u32;
                                     self.write_register(register, (self.read_register(register) & 0xFFFF0000) | value);
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    let value = self.pop_stack_32();
+                                    let value = self.pop_stack_32()?;
                                     self.write_register(register, value);
                                 }
                             }
@@ -2462,49 +2490,49 @@ impl Cpu {
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::RegisterPtr(_) => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         let pointer = self.read_register(register);
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    let value = self.pop_stack_8();
-                                    self.bus.memory.write_8(&self.onfault, pointer, value);
+                                    let value = self.pop_stack_8()?;
+                                    self.bus.memory.write_8(pointer, value)?;
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    let value = self.pop_stack_16();
-                                    self.bus.memory.write_16(&self.onfault, pointer, value);
+                                    let value = self.pop_stack_16()?;
+                                    self.bus.memory.write_16(pointer, value)?;
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    let value = self.pop_stack_32();
-                                    self.bus.memory.write_32(&self.onfault, pointer, value);
+                                    let value = self.pop_stack_32()?;
+                                    self.bus.memory.write_32(pointer, value)?;
                                 }
                             }
                         }
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                     }
                     Operand::ImmediatePtr(_) => {
-                        let pointer = self.bus.memory.read_32(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset)?;
                         match size {
                             Size::Byte => {
                                 if should_run {
-                                    let value = self.pop_stack_8();
-                                    self.bus.memory.write_8(&self.onfault, pointer, value);
+                                    let value = self.pop_stack_8()?;
+                                    self.bus.memory.write_8(pointer, value)?;
                                 }
                             }
                             Size::Half => {
                                 if should_run {
-                                    let value = self.pop_stack_16();
-                                    self.bus.memory.write_16(&self.onfault, pointer, value);
+                                    let value = self.pop_stack_16()?;
+                                    self.bus.memory.write_16(pointer, value)?;
                                 }
                             }
                             Size::Word => {
                                 if should_run {
-                                    let value = self.pop_stack_32();
-                                    self.bus.memory.write_32(&self.onfault, pointer, value);
+                                    let value = self.pop_stack_32()?;
+                                    self.bus.memory.write_32(pointer, value)?;
                                 }
                             }
                         }
@@ -2512,7 +2540,7 @@ impl Cpu {
                     }
                     _ => panic!("Attempting to use an immediate value as a destination"),
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
             Instruction::Ret(condition) => {
                 let instruction_pointer_offset = 2; // increment past opcode half
@@ -2520,30 +2548,31 @@ impl Cpu {
                 if should_run {
                     self.pop_stack_32()
                 } else {
-                    self.instruction_pointer + instruction_pointer_offset
+                    Some(self.instruction_pointer + instruction_pointer_offset)
                 }
             }
             Instruction::Reti(condition) => {
                 let instruction_pointer_offset = 2; // increment past opcode half
                 let should_run = self.check_condition(condition);
                 if should_run {
-                    self.flag = Flag::from(self.pop_stack_8());
-                    let instruction_pointer = self.pop_stack_32();
+                    let flag = Flag::from(self.pop_stack_8()?);
+                    let instruction_pointer = self.pop_stack_32()?;
+                    self.flag = flag;
                     if self.flag.swap_sp {
-                        self.stack_pointer = self.pop_stack_32();
+                        self.stack_pointer = self.pop_stack_32()?;
                     }
-                    instruction_pointer
+                    Some(instruction_pointer)
                 } else {
-                    self.instruction_pointer + instruction_pointer_offset
+                    Some(self.instruction_pointer + instruction_pointer_offset)
                 }
             }
 
             Instruction::In(condition, destination, source) => {
-                let (source_value, mut instruction_pointer_offset) = self.read_source(source);
+                let (source_value, mut instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         let value = self.bus.read_io(source_value);
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                         if should_run {
@@ -2551,57 +2580,57 @@ impl Cpu {
                         }
                     }
                     Operand::RegisterPtr(_) => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         let pointer = self.read_register(register);
                         let value = self.bus.read_io(source_value);
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                         if should_run {
-                            self.bus.memory.write_32(&self.onfault, pointer, value);
+                            self.bus.memory.write_32(pointer, value)?;
                         }
                     }
                     Operand::ImmediatePtr(_) => {
-                        let pointer = self.bus.memory.read_32(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset)?;
                         let value = self.bus.read_io(source_value);
                         instruction_pointer_offset += 4; // increment past 32 bit pointer
                         if should_run {
-                            self.bus.memory.write_32(&self.onfault, pointer, value);
+                            self.bus.memory.write_32(pointer, value)?;
                         }
                     }
                     _ => panic!("Attempting to use an immediate value as a destination"),
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
             Instruction::Out(condition, destination, source) => {
-                let (source_value, mut instruction_pointer_offset) = self.read_source(source);
+                let (source_value, mut instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 match destination {
                     Operand::Register => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                         if should_run {
                             self.bus.write_io(self.read_register(register), source_value);
                         }
                     }
                     Operand::RegisterPtr(_) => {
-                        let register = self.bus.memory.read_8(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let register = self.bus.memory.read_8(self.instruction_pointer + instruction_pointer_offset)?;
                         let pointer = self.read_register(register);
                         instruction_pointer_offset += 1; // increment past 8 bit register number
                         if should_run {
-                            let word = self.bus.memory.read_32(&self.onfault, pointer);
+                            let word = self.bus.memory.read_32(pointer)?;
                             self.bus.write_io(word, source_value);
                         }
                     }
                     Operand::ImmediatePtr(_) => {
-                        let pointer = self.bus.memory.read_32(&self.onfault, self.instruction_pointer + instruction_pointer_offset);
+                        let pointer = self.bus.memory.read_32(self.instruction_pointer + instruction_pointer_offset)?;
                         instruction_pointer_offset += 4; // increment past 32 bit pointer
                         if should_run {
-                            let word = self.bus.memory.read_32(&self.onfault, pointer);
+                            let word = self.bus.memory.read_32(pointer)?;
                             self.bus.write_io(word, source_value);
                         }
                     }
                     _ => panic!("Attempting to use an immediate value as a destination"),
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
 
             Instruction::Ise(condition) => {
@@ -2610,7 +2639,7 @@ impl Cpu {
                 if should_run {
                     self.flag.interrupt = true;
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
             Instruction::Icl(condition) => {
                 let instruction_pointer_offset = 2; // increment past opcode half
@@ -2618,17 +2647,17 @@ impl Cpu {
                 if should_run {
                     self.flag.interrupt = false;
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
             Instruction::Int(condition, source) => {
-                let (source_value, instruction_pointer_offset) = self.read_source(source);
+                let (source_value, instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 if should_run {
                     self.instruction_pointer += instruction_pointer_offset;
                     self.handle_interrupt(source_value as u16);
-                    self.instruction_pointer
+                    Some(self.instruction_pointer)
                 } else {
-                    self.instruction_pointer + instruction_pointer_offset
+                    Some(self.instruction_pointer + instruction_pointer_offset)
                 }
             }
 
@@ -2638,7 +2667,7 @@ impl Cpu {
                 if should_run {
                     *self.bus.memory.mmu_enabled() = true;
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
             Instruction::Mcl(condition) => {
                 let instruction_pointer_offset = 2; // increment past opcode half
@@ -2646,23 +2675,23 @@ impl Cpu {
                 if should_run {
                     *self.bus.memory.mmu_enabled() = false;
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
             Instruction::Tlb(condition, source) => {
-                let (source_value, instruction_pointer_offset) = self.read_source(source);
+                let (source_value, instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 if should_run {
                     self.bus.memory.flush_tlb(Some(source_value));
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
             Instruction::Flp(condition, source) => {
-                let (source_value, instruction_pointer_offset) = self.read_source(source);
+                let (source_value, instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 if should_run {
                     self.bus.memory.flush_page(source_value);
                 }
-                self.instruction_pointer + instruction_pointer_offset
+                Some(self.instruction_pointer + instruction_pointer_offset)
             }
         }
     }
