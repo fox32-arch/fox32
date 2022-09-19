@@ -264,6 +264,7 @@ impl Cpu {
         *self.bus.memory.mmu_enabled() = false;
         let address_maybe = self.bus.memory.read_32(address_of_pointer);
         if address_maybe == None {
+            *self.bus.memory.mmu_enabled() = old_mmu_state;
             return;
         }
         let address = address_maybe.unwrap();
@@ -292,6 +293,7 @@ impl Cpu {
         *self.bus.memory.mmu_enabled() = false;
         let address_maybe = self.bus.memory.read_32(address_of_pointer);
         if address_maybe == None {
+            *self.bus.memory.mmu_enabled() = old_mmu_state;
             return;
         }
         let address = address_maybe.unwrap();
