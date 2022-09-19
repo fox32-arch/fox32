@@ -267,23 +267,15 @@ impl Memory {
         }
     }
     pub fn write_16(&mut self, address: u32, half: u16) -> Option<()> {
-        let result_0 = self.write_8(address, (half & 0x00FF) as u8);
-        let result_1 = self.write_8(address + 1, (half >> 8) as u8);
-        if let (Some(_), Some(_)) = (result_0, result_1) {
-            Some(())
-        } else {
-            None
-        }
+        self.write_8(address, (half & 0x00FF) as u8)?;
+        self.write_8(address + 1, (half >> 8) as u8)?;
+        Some(())
     }
     pub fn write_32(&mut self, address: u32, word: u32) -> Option<()> {
-        let result_0 = self.write_8(address, (word & 0x000000FF) as u8);
-        let result_1 = self.write_8(address + 1, ((word & 0x0000FF00) >>  8) as u8);
-        let result_2 = self.write_8(address + 2, ((word & 0x00FF0000) >> 16) as u8);
-        let result_3 = self.write_8(address + 3, ((word & 0xFF000000) >> 24) as u8);
-        if let (Some(_), Some(_), Some(_), Some(_)) = (result_0, result_1, result_2, result_3) {
-            Some(())
-        } else {
-            None
-        }
+        self.write_8(address, (word & 0x000000FF) as u8)?;
+        self.write_8(address + 1, ((word & 0x0000FF00) >>  8) as u8)?;
+        self.write_8(address + 2, ((word & 0x00FF0000) >> 16) as u8)?;
+        self.write_8(address + 3, ((word & 0xFF000000) >> 24) as u8)?;
+        Some(())
     }
 }
