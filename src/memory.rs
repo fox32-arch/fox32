@@ -201,14 +201,12 @@ impl Memory {
         }
     }
     pub fn read_opt_16(&mut self, address: u32) -> Option<u16> {
-        Some(
-            (self.read_opt_8(address)? as u16) |
+        Some(self.read_opt_8(address)? as u16 |
             (self.read_opt_8(address + 1)? as u16) << 8
         )
     }
     pub fn read_opt_32(&mut self, address: u32) -> Option<u32> {
-        Some(
-            (self.read_opt_8(address)? as u32) |
+        Some(self.read_opt_8(address)? as u32 |
             (self.read_opt_8(address + 1)? as u32) <<  8 |
             (self.read_opt_8(address + 2)? as u32) << 16 |
             (self.read_opt_8(address + 3)? as u32) << 24
@@ -226,26 +224,16 @@ impl Memory {
         }
     }
     pub fn read_16(&mut self, address: u32) -> Option<u16> {
-        let mut read_ok = true;
-        let value = self.read_8(address).unwrap_or_else(|| { read_ok = false; 0 }) as u16 |
-                    (self.read_8(address + 1).unwrap_or_else(|| { read_ok = false; 0 }) as u16) << 8;
-        if read_ok {
-            Some(value)
-        } else {
-            None
-        }
+        Some(self.read_8(address)? as u16 |
+            (self.read_8(address + 1)? as u16) << 8
+        )
     }
     pub fn read_32(&mut self, address: u32) -> Option<u32> {
-        let mut read_ok = true;
-        let value = self.read_8(address).unwrap_or_else(|| { read_ok = false; 0 }) as u32 |
-                    (self.read_8(address + 1).unwrap_or_else(|| { read_ok = false; 0 }) as u32) <<  8 |
-                    (self.read_8(address + 2).unwrap_or_else(|| { read_ok = false; 0 }) as u32) << 16 |
-                    (self.read_8(address + 3).unwrap_or_else(|| { read_ok = false; 0 }) as u32) << 24;
-        if read_ok {
-            Some(value)
-        } else {
-            None
-        }
+        Some(self.read_8(address)? as u32 |
+            (self.read_8(address + 1)? as u32) <<  8 |
+            (self.read_8(address + 2)? as u32) << 16 |
+            (self.read_8(address + 3)? as u32) << 24
+        )
     }
 
     pub fn write_8(&mut self, mut address: u32, byte: u8) -> Option<()> {
