@@ -76,8 +76,10 @@ fn main() {
 
     let args: Vec<String> = env::args().collect();
 
+    let (debug_toggle_sender, debug_toggle_receiver) = mpsc::channel::<()>();
+
     let mut display = Display::new();
-    let keyboard = Arc::new(Mutex::new(Keyboard::new()));
+    let keyboard = Arc::new(Mutex::new(Keyboard::new(debug_toggle_sender)));
     let mouse = Arc::new(Mutex::new(Mouse::new()));
 
     let audio_channel_0 = Arc::new(Mutex::new(AudioChannel::new(0)));
@@ -122,7 +124,7 @@ fn main() {
     let rom_top_address = rom_bottom_address + rom_size - 1;
     println!("ROM: {:.2} KiB mapped at physical {:#010X}-{:#010X}", rom_size / 1024, rom_bottom_address, rom_top_address);
 
-    let mut cpu = Cpu::new(bus);
+    let mut cpu = Cpu::new(bus, debug_toggle_receiver);
 
     let event_loop = EventLoop::new();
     let mut input = WinitInputHelper::new();
@@ -160,10 +162,12 @@ fn main() {
             loop {
                 while !cpu.halted {
                     if let Ok(exception) = exception_receiver.try_recv() {
-                        cpu.interrupt(Interrupt::Exception(exception));
+                        (cpu.next_exception, cpu.next_exception_operand) = cpu.exception_to_vector(exception);
                     } else {
                         if let Ok(interrupt) = interrupt_receiver.try_recv() {
-                            cpu.interrupt(interrupt);
+                            if let Interrupt::Request(vector) = interrupt {
+                                cpu.next_interrupt = Some(vector);
+                            }
                         }
                     }
                     cpu.execute_memory_instruction();
@@ -182,8 +186,10 @@ fn main() {
                     break;
                 }
                 if let Ok(interrupt) = interrupt_receiver.recv() {
-                    cpu.halted = false;
-                    cpu.interrupt(interrupt);
+                    if let Interrupt::Request(vector) = interrupt {
+                        cpu.next_interrupt = Some(vector);
+                        cpu.halted = false;
+                    }
                 } else {
                     // sender is closed, break
                     break;

@@ -3,9 +3,9 @@
 // TODO: in the instruction match statement, all of the register ones have `let result` inside the if statement
 //       move this up to match all of the other ones (or move all of the other ones down, which would probably be better anyways)
 
-use crate::Bus;
+use std::sync::mpsc::Receiver;
 
-const DEBUG: bool = false;
+use crate::Bus;
 
 #[derive(Copy, Clone)]
 pub struct Flag {
@@ -59,10 +59,18 @@ pub struct Cpu {
     pub halted: bool,
 
     pub bus: Bus,
+
+    pub next_interrupt: Option<u8>,
+    pub next_soft_interrupt: Option<u8>,
+    pub next_exception: Option<u8>,
+    pub next_exception_operand: Option<u32>,
+
+    pub debug: bool,
+    debug_toggle_receiver: Receiver<()>,
 }
 
 impl Cpu {
-    pub fn new(bus: Bus) -> Self {
+    pub fn new(bus: Bus, debug_toggle_receiver: Receiver<()>) -> Self {
         Cpu {
             instruction_pointer: 0xF0000000,
             stack_pointer: 0x00000000,
@@ -72,6 +80,12 @@ impl Cpu {
             flag: Flag { swap_sp: false, interrupt: false, carry: false, zero: false },
             halted: false,
             bus,
+            next_interrupt: None,
+            next_soft_interrupt: None,
+            next_exception: None,
+            next_exception_operand: None,
+            debug: false,
+            debug_toggle_receiver,
         }
     }
     fn check_condition(&self, condition: Condition) -> bool {
@@ -225,39 +239,24 @@ impl Cpu {
             None => None,
         }
     }
-    pub fn interrupt(&mut self, interrupt: Interrupt) {
-        if DEBUG { println!("interrupt(): enabled: {}", self.flag.interrupt); }
-        let is_exception = if let Interrupt::Exception(_) = interrupt { true } else { false };
-        if self.flag.interrupt || is_exception {
-            match interrupt {
-                Interrupt::Request(vector) => {
-                    self.handle_interrupt(vector as u16);
-                }
-                Interrupt::Exception(exception) => {
-                    match exception {
-                        Exception::DivideByZero => {
-                            let vector: u16 = 0;
-                            self.handle_exception(vector, None);
-                        }
-                        Exception::InvalidOpcode(opcode) => {
-                            let vector: u16 = 1;
-                            self.handle_exception(vector, Some(opcode));
-                        }
-                        Exception::PageFaultRead(virtual_address) => {
-                            let vector: u16 = 2;
-                            self.handle_exception(vector, Some(virtual_address));
-                        }
-                        Exception::PageFaultWrite(virtual_address) => {
-                            let vector: u16 = 3;
-                            self.handle_exception(vector, Some(virtual_address));
-                        }
-                    }
-                }
+    pub fn exception_to_vector(&mut self, exception: Exception) -> (Option<u8>, Option<u32>) {
+        match exception {
+            Exception::DivideByZero => {
+                (Some(0), None)
+            }
+            Exception::InvalidOpcode(opcode) => {
+                (Some(1), Some(opcode))
+            }
+            Exception::PageFaultRead(virtual_address) => {
+                (Some(2), Some(virtual_address))
+            }
+            Exception::PageFaultWrite(virtual_address) => {
+                (Some(3), Some(virtual_address))
             }
         }
     }
-    fn handle_interrupt(&mut self, vector: u16) {
-        if DEBUG { println!("interrupt!!! vector: {:#04X}", vector); }
+    fn handle_interrupt(&mut self, vector: u8) {
+        if self.debug { println!("interrupt!!! vector: {:#04X}", vector); }
         let address_of_pointer = vector as u32 * 4;
 
         let old_mmu_state = *self.bus.memory.mmu_enabled();
@@ -285,9 +284,9 @@ impl Cpu {
         self.flag.interrupt = false; // prevent interrupts while already servicing an interrupt
         self.instruction_pointer = address;
     }
-    fn handle_exception(&mut self, vector: u16, operand: Option<u32>) {
-        if DEBUG { println!("exception!!! vector: {:#04X}, operand: {:?}", vector, operand); }
-        let address_of_pointer = (256 + vector) as u32 * 4;
+    fn handle_exception(&mut self, vector: u8, operand: Option<u32>) {
+        if self.debug { println!("exception!!! vector: {:#04X}, operand: {:?}", vector, operand); }
+        let address_of_pointer = (256 + vector as u32) * 4;
 
         let old_mmu_state = *self.bus.memory.mmu_enabled();
         *self.bus.memory.mmu_enabled() = false;
@@ -320,6 +319,24 @@ impl Cpu {
     }
     // execute instruction from memory at the current instruction pointer
     pub fn execute_memory_instruction(&mut self) {
+        if let Some(vector) = self.next_exception {
+            self.handle_exception(vector, self.next_exception_operand);
+            self.next_exception = None;
+            self.next_exception_operand = None;
+        }
+        if let Some(vector) = self.next_soft_interrupt {
+            if self.flag.interrupt {
+                self.handle_interrupt(vector);
+                self.next_soft_interrupt = None;
+            }
+        }
+        if let Some(vector) = self.next_interrupt {
+            if self.flag.interrupt {
+                self.handle_interrupt(vector);
+                self.next_interrupt = None;
+            }
+        }
+
         let opcode_maybe = self.bus.memory.read_16(self.instruction_pointer);
         if opcode_maybe == None {
             return;
@@ -327,10 +344,13 @@ impl Cpu {
         let opcode = opcode_maybe.unwrap();
 
         if let Some(instruction) = Instruction::from_half(opcode) {
-            if DEBUG { println!("{:#010X}: {:?}", self.instruction_pointer, instruction); }
+            if self.debug { println!("{:#010X}: {:?}", self.instruction_pointer, instruction); }
             let next_instruction_pointer = self.execute_instruction(instruction);
             if let Some(next) = next_instruction_pointer {
                 self.instruction_pointer = next;
+            }
+            if let Ok(_) = self.debug_toggle_receiver.try_recv() {
+                self.debug = !self.debug;
             }
         } else {
             let size = ((opcode & 0b1100000000000000) >> 14) as u8;
@@ -2658,9 +2678,8 @@ impl Cpu {
                 let (source_value, instruction_pointer_offset) = self.read_source(source)?;
                 let should_run = self.check_condition(condition);
                 if should_run {
-                    self.instruction_pointer += instruction_pointer_offset;
-                    self.handle_interrupt(source_value as u16);
-                    Some(self.instruction_pointer)
+                    self.next_soft_interrupt = Some(source_value as u8);
+                    Some(self.instruction_pointer + instruction_pointer_offset)
                 } else {
                     Some(self.instruction_pointer + instruction_pointer_offset)
                 }

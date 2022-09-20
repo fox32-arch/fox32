@@ -1,20 +1,23 @@
 // keyboard.rs
 
+
 use crate::warn;
 
 use ringbuf::{Consumer, Producer, RingBuffer};
+use std::sync::mpsc::Sender;
 use winit::event::{ElementState, VirtualKeyCode};
 
 pub struct Keyboard {
     consumer: Consumer<u8>,
     producer: Producer<u8>,
+    debug_toggle_sender: Sender<()>,
 }
 
 impl Keyboard {
-    pub fn new() -> Self {
+    pub fn new(debug_toggle_sender: Sender<()>) -> Self {
         let buffer = RingBuffer::<u8>::new(32);
         let (producer, consumer) = buffer.split();
-        Keyboard { consumer, producer }
+        Keyboard { consumer, producer, debug_toggle_sender }
     }
 
     fn keycode_to_scancode(&self, keycode: VirtualKeyCode) -> u8 {
@@ -104,6 +107,10 @@ impl Keyboard {
         };
         if state == ElementState::Released && scancode != 0x00 {
             scancode |= 0x80; // "break" scancode
+        }
+        if scancode == 0x57 {
+            self.debug_toggle_sender.send(()).unwrap();
+            return;
         }
         self.producer.push(scancode).unwrap_or_else(|_| warn("keyboard buffer full!"));
     }
