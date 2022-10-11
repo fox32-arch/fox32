@@ -267,11 +267,33 @@ impl Memory {
         }
     }
     pub fn write_16(&mut self, address: u32, half: u16) -> Option<()> {
+        // first check if we can write to all addresses without faulting
+        if *self.mmu_enabled() {
+            let (_, writable_0) = self.virtual_to_physical(address).unwrap_or_else(|| (0, false));
+            let (_, writable_1) = self.virtual_to_physical(address + 1).unwrap_or_else(|| (0, false));
+            if !writable_0 { self.exception_sender().send(Exception::PageFaultWrite(address)).unwrap(); return None }
+            if !writable_1 { self.exception_sender().send(Exception::PageFaultWrite(address + 1)).unwrap(); return None }
+        }
+
+        // then do the actual writes
         self.write_8(address, (half & 0x00FF) as u8)?;
         self.write_8(address + 1, (half >> 8) as u8)?;
         Some(())
     }
     pub fn write_32(&mut self, address: u32, word: u32) -> Option<()> {
+        // first check if we can write to all addresses without faulting
+        if *self.mmu_enabled() {
+            let (_, writable_0) = self.virtual_to_physical(address).unwrap_or_else(|| (0, false));
+            let (_, writable_1) = self.virtual_to_physical(address + 1).unwrap_or_else(|| (0, false));
+            let (_, writable_2) = self.virtual_to_physical(address + 2).unwrap_or_else(|| (0, false));
+            let (_, writable_3) = self.virtual_to_physical(address + 3).unwrap_or_else(|| (0, false));
+            if !writable_0 { self.exception_sender().send(Exception::PageFaultWrite(address)).unwrap(); return None }
+            if !writable_1 { self.exception_sender().send(Exception::PageFaultWrite(address + 1)).unwrap(); return None }
+            if !writable_2 { self.exception_sender().send(Exception::PageFaultWrite(address + 2)).unwrap(); return None }
+            if !writable_3 { self.exception_sender().send(Exception::PageFaultWrite(address + 3)).unwrap(); return None }
+        }
+
+        // then do the actual writes
         self.write_8(address, (word & 0x000000FF) as u8)?;
         self.write_8(address + 1, ((word & 0x0000FF00) >>  8) as u8)?;
         self.write_8(address + 2, ((word & 0x00FF0000) >> 16) as u8)?;
