@@ -323,14 +323,12 @@ impl Cpu {
             self.handle_exception(vector, self.next_exception_operand);
             self.next_exception = None;
             self.next_exception_operand = None;
-        }
-        if let Some(vector) = self.next_soft_interrupt {
+        } else if let Some(vector) = self.next_soft_interrupt {
             if self.flag.interrupt {
                 self.handle_interrupt(vector);
                 self.next_soft_interrupt = None;
             }
-        }
-        if let Some(vector) = self.next_interrupt {
+        } else if let Some(vector) = self.next_interrupt {
             if self.flag.interrupt {
                 self.handle_interrupt(vector);
                 self.next_interrupt = None;
