@@ -2521,19 +2521,28 @@ impl Cpu {
                             Size::Byte => {
                                 if should_run {
                                     let value = self.pop_stack_8()?;
-                                    self.bus.memory.write_8(pointer, value)?;
+                                    let success = self.bus.memory.write_8(pointer, value);
+                                    if let None = success {
+                                        self.stack_pointer = self.stack_pointer.overflowing_sub(1).0;
+                                    }
                                 }
                             }
                             Size::Half => {
                                 if should_run {
                                     let value = self.pop_stack_16()?;
-                                    self.bus.memory.write_16(pointer, value)?;
+                                    let success = self.bus.memory.write_16(pointer, value);
+                                    if let None = success {
+                                        self.stack_pointer = self.stack_pointer.overflowing_sub(2).0;
+                                    }
                                 }
                             }
                             Size::Word => {
                                 if should_run {
                                     let value = self.pop_stack_32()?;
-                                    self.bus.memory.write_32(pointer, value)?;
+                                    let success = self.bus.memory.write_32(pointer, value);
+                                    if let None = success {
+                                        self.stack_pointer = self.stack_pointer.overflowing_sub(4).0;
+                                    }
                                 }
                             }
                         }
@@ -2545,19 +2554,28 @@ impl Cpu {
                             Size::Byte => {
                                 if should_run {
                                     let value = self.pop_stack_8()?;
-                                    self.bus.memory.write_8(pointer, value)?;
+                                    let success = self.bus.memory.write_8(pointer, value);
+                                    if let None = success {
+                                        self.stack_pointer = self.stack_pointer.overflowing_sub(1).0;
+                                    }
                                 }
                             }
                             Size::Half => {
                                 if should_run {
                                     let value = self.pop_stack_16()?;
-                                    self.bus.memory.write_16(pointer, value)?;
+                                    let success = self.bus.memory.write_16(pointer, value);
+                                    if let None = success {
+                                        self.stack_pointer = self.stack_pointer.overflowing_sub(2).0;
+                                    }
                                 }
                             }
                             Size::Word => {
                                 if should_run {
                                     let value = self.pop_stack_32()?;
-                                    self.bus.memory.write_32(pointer, value)?;
+                                    let success = self.bus.memory.write_32(pointer, value);
+                                    if let None = success {
+                                        self.stack_pointer = self.stack_pointer.overflowing_sub(4).0;
+                                    }
                                 }
                             }
                         }
