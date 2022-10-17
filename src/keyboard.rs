@@ -31,6 +31,7 @@ impl Keyboard {
             VirtualKeyCode::Key6 => 0x07,
             VirtualKeyCode::Key7 => 0x08,
             VirtualKeyCode::Key8 => 0x09,
+            VirtualKeyCode::Asterisk => 0x09,
             VirtualKeyCode::Key9 => 0x0A,
             VirtualKeyCode::Key0 => 0x0B,
             VirtualKeyCode::Minus => 0x0C,
