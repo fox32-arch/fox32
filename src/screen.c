@@ -96,10 +96,6 @@ void ScreenDraw() {
     }
 }
 
-bool IsAltDown = false;
-
-extern bool UserBreak;
-
 int ScreenProcessEvents() {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
@@ -194,24 +190,20 @@ struct Screen ScreenCreate(
     ScreenMouseMovedF mousemoved
 ) {
 
-    struct Screen screen;
-
     if (w > WindowWidth)
         WindowWidth = w;
 
     if (h > WindowHeight)
         WindowHeight = h;
 
-    screen.Width = w;
-    screen.Height = h;
-    screen.Title = title;
+    MainScreen.Width = w;
+    MainScreen.Height = h;
+    MainScreen.Title = title;
 
-    screen.Draw = draw;
-    screen.KeyPressed = keypressed;
-    screen.KeyReleased = keyreleased;
-    screen.MousePressed = mousepressed;
-    screen.MouseReleased = mousereleased;
-    screen.MouseMoved = mousemoved;
-
-    MainScreen = screen;
+    MainScreen.Draw = draw;
+    MainScreen.KeyPressed = keypressed;
+    MainScreen.KeyReleased = keyreleased;
+    MainScreen.MousePressed = mousepressed;
+    MainScreen.MouseReleased = mousereleased;
+    MainScreen.MouseMoved = mousemoved;
 }
