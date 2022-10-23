@@ -16,7 +16,7 @@ uint32_t PixelBuffer[FRAMEBUFFER_WIDTH * FRAMEBUFFER_HEIGHT];
 
 extern fox32_vm_t vm;
 
-void FramebufferDraw(struct Screen screen) {
+void FramebufferDraw(struct Screen *screen) {
     SDL_Texture *texture = ScreenGetTexture(screen);
     memcpy(PixelBuffer, &vm.memory_ram[0x02000000], FRAMEBUFFER_WIDTH * FRAMEBUFFER_HEIGHT * 4);
     SDL_UpdateTexture(texture, NULL, PixelBuffer, FRAMEBUFFER_WIDTH * 4);

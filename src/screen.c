@@ -56,7 +56,7 @@ void ScreenInit() {
 }
 
 void ScreenDraw() {
-    MainScreen.Draw(MainScreen);
+    MainScreen.Draw(&MainScreen);
 
     SDL_Rect screenrect = {
         .w = MainScreen.Width,
@@ -111,7 +111,7 @@ int ScreenProcessEvents() {
             case SDL_MOUSEMOTION: {
                 if (ScreenMouseGrabbed) {
                     if (MainScreen.MouseMoved)
-                        MainScreen.MouseMoved(MainScreen, event.motion.xrel, event.motion.yrel);
+                        MainScreen.MouseMoved(&MainScreen, event.motion.xrel, event.motion.yrel);
                 }
                 break;
             }
@@ -127,14 +127,14 @@ int ScreenProcessEvents() {
                 }
 
                 if (MainScreen.MousePressed)
-                    MainScreen.MousePressed(MainScreen, event.button.button);
+                    MainScreen.MousePressed(&MainScreen, event.button.button);
                 break;
             }
 
 
             case SDL_MOUSEBUTTONUP: {
                 if (MainScreen.MouseReleased)
-                    MainScreen.MouseReleased(MainScreen, event.button.button);
+                    MainScreen.MouseReleased(&MainScreen, event.button.button);
                 break;
             }
 
@@ -149,12 +149,12 @@ int ScreenProcessEvents() {
                 }
 
                 if (MainScreen.KeyPressed)
-                    MainScreen.KeyPressed(MainScreen, event.key.keysym.scancode);
+                    MainScreen.KeyPressed(&MainScreen, event.key.keysym.scancode);
                 break;
 
             case SDL_KEYUP:
                 if (MainScreen.KeyReleased)
-                    MainScreen.KeyReleased(MainScreen, event.key.keysym.scancode);
+                    MainScreen.KeyReleased(&MainScreen, event.key.keysym.scancode);
                 break;
         }
     }
@@ -162,22 +162,22 @@ int ScreenProcessEvents() {
     return 0;
 }
 
-struct SDL_Texture *ScreenGetTexture(struct Screen screen) {
-    if (screen.Texture) {
-        return screen.Texture;
+struct SDL_Texture *ScreenGetTexture(struct Screen *screen) {
+    if (screen->Texture) {
+        return screen->Texture;
     }
 
-    screen.Texture = SDL_CreateTexture(
+    screen->Texture = SDL_CreateTexture(
         ScreenRenderer,
         SDL_PIXELFORMAT_ABGR32,
         SDL_TEXTUREACCESS_STREAMING,
-        screen.Width,
-        screen.Height
+        screen->Width,
+        screen->Height
     );
 
-    SDL_SetTextureScaleMode(screen.Texture, SDL_ScaleModeNearest);
+    SDL_SetTextureScaleMode(screen->Texture, SDL_ScaleModeNearest);
 
-    return screen.Texture;
+    return screen->Texture;
 }
 
 struct Screen ScreenCreate(

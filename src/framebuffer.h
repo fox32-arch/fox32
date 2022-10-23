@@ -7,4 +7,4 @@
 
 #define VSYNC_INTERRUPT_VECTOR 0xFF
 
-void FramebufferDraw(struct Screen screen);
+void FramebufferDraw(struct Screen *screen);
