@@ -48,7 +48,7 @@ void draw_framebuffer(struct Screen *screen) {
             for (size_t x = xmin; x < xmax; x++) {
                 size_t index_dst = (x + y * FRAMEBUFFER_WIDTH) * 4;
                 size_t index_src = ((x - xmin) + (y - ymin) * width) * 4 + pointer;
-                if (vm.memory_ram[index_src] > 0) {
+                if (vm.memory_ram[index_src + 3] > 0) {
                     memcpy(&framebuffer[index_dst], &vm.memory_ram[index_src], 4);
                 }
             }
