@@ -7,4 +7,13 @@
 
 #define VSYNC_INTERRUPT_VECTOR 0xFF
 
-void FramebufferDraw(struct Screen *screen);
+void draw_framebuffer(struct Screen *screen);
+
+typedef struct {
+    uint32_t pointer;
+    uint32_t x, y;
+    uint32_t width, height;
+    bool enabled;
+} overlay_t;
+
+overlay_t *overlay_get(uint32_t index);

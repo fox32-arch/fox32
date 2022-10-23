@@ -1,8 +1,9 @@
 SDL2_CONFIG = sdl2-config
-CFLAGS = -g -Ofast -std=c99 `$(SDL2_CONFIG) --cflags --libs`
+CFLAGS = -g -Ofast -std=c99 -Wall -Wextra `$(SDL2_CONFIG) --cflags --libs`
 TARGET=fox32
 
 CFILES = src/main.c \
+		src/bus.c \
 		src/cpu.c \
 		src/framebuffer.c \
 		src/screen.c

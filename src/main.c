@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "bus.h"
 #include "cpu.h"
 #include "framebuffer.h"
 #include "screen.h"
@@ -33,6 +34,8 @@ int main(int argc, char *argv[]) {
     }
 
     fox32_init(&vm);
+    vm.io_read = bus_io_read;
+    vm.io_write = bus_io_write;
     vm.halted = false;
     //vm.debug = true;
 
@@ -40,8 +43,7 @@ int main(int argc, char *argv[]) {
 
     ScreenCreate(
         FRAMEBUFFER_WIDTH, FRAMEBUFFER_HEIGHT,
-        "fox32 framebuffer",
-        FramebufferDraw,
+        draw_framebuffer,
         0,
         0,
         0,

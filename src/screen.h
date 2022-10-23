@@ -14,9 +14,6 @@ typedef void (*ScreenMouseMovedF)(struct Screen *screen, int dx, int dy);
 struct Screen {
     int Width;
     int Height;
-    void *Context1;
-    void *Context2;
-    char *Title;
     SDL_Texture *Texture;
 
     ScreenDrawF Draw;
@@ -35,8 +32,8 @@ int ScreenProcessEvents();
 
 struct SDL_Texture *ScreenGetTexture(struct Screen *screen);
 
-struct Screen ScreenCreate(
-    int w, int h, char *title,
+void ScreenCreate(
+    int w, int h,
     ScreenDrawF draw,
     ScreenKeyPressedF keypressed,
     ScreenKeyReleasedF keyreleased,

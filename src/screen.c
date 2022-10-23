@@ -180,8 +180,8 @@ struct SDL_Texture *ScreenGetTexture(struct Screen *screen) {
     return screen->Texture;
 }
 
-struct Screen ScreenCreate(
-    int w, int h, char *title,
+void ScreenCreate(
+    int w, int h,
     ScreenDrawF draw,
     ScreenKeyPressedF keypressed,
     ScreenKeyReleasedF keyreleased,
@@ -198,7 +198,6 @@ struct Screen ScreenCreate(
 
     MainScreen.Width = w;
     MainScreen.Height = h;
-    MainScreen.Title = title;
 
     MainScreen.Draw = draw;
     MainScreen.KeyPressed = keypressed;

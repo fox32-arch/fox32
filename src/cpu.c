@@ -34,16 +34,14 @@ typedef fox32_io_read_t io_read_t;
 typedef fox32_io_write_t io_write_t;
 
 static int io_read_default_impl(void *user, uint32_t *value, uint32_t port) {
-    //return (void) user, (void) value, (int) port;
-    return 0;
+    return (void) user, (void) value, (int) port;
 }
 static int io_write_default_impl(void *user, uint32_t value, uint32_t port) {
     if (port == 0) {
         putchar((int) value);
         fflush(stdout);
     }
-    //return (void) user, (int) port;
-    return 0;
+    return (void) user, (int) port;
 }
 
 static io_read_t *const io_read_default = io_read_default_impl;
