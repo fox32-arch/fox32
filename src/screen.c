@@ -169,7 +169,7 @@ struct SDL_Texture *ScreenGetTexture(struct Screen *screen) {
 
     screen->Texture = SDL_CreateTexture(
         ScreenRenderer,
-        SDL_PIXELFORMAT_ABGR32,
+        SDL_PIXELFORMAT_ABGR8888,
         SDL_TEXTUREACCESS_STREAMING,
         screen->Width,
         screen->Height
