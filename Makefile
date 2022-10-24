@@ -13,4 +13,4 @@ $(TARGET): $(CFILES)
 	$(CC) -o $@ $(filter %.c, $^) $(CFLAGS)
 
 clean:
-	rm -rf fox32*
+	rm -rf fox32
