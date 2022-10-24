@@ -11,14 +11,16 @@
 #include "bus.h"
 #include "cpu.h"
 #include "framebuffer.h"
+#include "mouse.h"
 
 extern fox32_vm_t vm;
+extern mouse_t mouse;
 
 int bus_io_read(void *user, uint32_t *value, uint32_t port) {
     (void) user;
     switch (port) {
         case 0x80000000 ... 0x8000031F: { // overlay port
-            uint8_t overlay_number = (port & 0x000000FF);
+            uint8_t overlay_number = port & 0x000000FF;
             uint8_t setting = (port & 0x0000FF00) >> 8;
             switch (setting) {
                 case 0x00: {
@@ -43,6 +45,26 @@ int bus_io_read(void *user, uint32_t *value, uint32_t port) {
                 case 0x03: {
                     // overlay enable status
                     *value = overlay_get(overlay_number)->enabled ? 1 : 0;
+                    break;
+                };
+            }
+
+            break;
+        };
+
+        case 0x80000400 ... 0x80000401: { // mouse port
+            uint8_t setting = port & 0x000000FF;
+            switch (setting) {
+                case 0x00: {
+                    // button states
+                    if (mouse.clicked) *value |= 0b001;
+                    if (mouse.released) *value |= 0b010;
+                    if (mouse.held) *value |= 0b100; else *value &= !0b100;
+                    break;
+                };
+                case 0x01: {
+                    // position
+                    *value = (mouse.y << 16) | mouse.x;
                     break;
                 };
             }
@@ -91,6 +113,27 @@ int bus_io_write(void *user, uint32_t value, uint32_t port) {
                 case 0x03: {
                     // overlay enable status
                     overlay_get(overlay_number)->enabled = value != 0;
+                    break;
+                };
+            }
+
+            break;
+        };
+
+        case 0x80000400 ... 0x80000401: { // mouse port
+            uint8_t setting = port & 0x000000FF;
+            switch (setting) {
+                case 0x00: {
+                    // button states
+                    mouse.clicked = value & 0b001;
+                    mouse.released = value & 0b010;
+                    mouse.held = value & 0b100;
+                    break;
+                };
+                case 0x01: {
+                    // position
+                    mouse.x = value & 0x0000FFFF;
+                    mouse.y = (value & 0xFFFF0000) >> 16;
                     break;
                 };
             }

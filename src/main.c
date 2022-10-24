@@ -10,6 +10,7 @@
 #include "bus.h"
 #include "cpu.h"
 #include "framebuffer.h"
+#include "mouse.h"
 #include "screen.h"
 
 #include "../fox32rom.h"
@@ -46,9 +47,9 @@ int main(int argc, char *argv[]) {
         draw_framebuffer,
         0,
         0,
-        0,
-        0,
-        0
+        mouse_pressed,
+        mouse_released,
+        mouse_moved
     );
 
     ScreenInit();

@@ -5,11 +5,11 @@
 struct Screen;
 
 typedef void (*ScreenDrawF)(struct Screen *screen);
-typedef void (*ScreenKeyPressedF)(struct Screen *screen, int sdlscancode);
-typedef void (*ScreenKeyReleasedF)(struct Screen *screen, int sdlscancode);
-typedef void (*ScreenMousePressedF)(struct Screen *screen, int button);
-typedef void (*ScreenMouseReleasedF)(struct Screen *screen, int button);
-typedef void (*ScreenMouseMovedF)(struct Screen *screen, int dx, int dy);
+typedef void (*ScreenKeyPressedF)(int sdl_scancode);
+typedef void (*ScreenKeyReleasedF)(int sdl_scancode);
+typedef void (*ScreenMousePressedF)(int button);
+typedef void (*ScreenMouseReleasedF)(int button);
+typedef void (*ScreenMouseMovedF)(int dx, int dy);
 
 struct Screen {
     int Width;
