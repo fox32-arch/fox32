@@ -5,6 +5,7 @@ TARGET=fox32
 CFILES = src/main.c \
 		src/bus.c \
 		src/cpu.c \
+		src/disk.c \
 		src/framebuffer.c \
 		src/mouse.c \
 		src/screen.c

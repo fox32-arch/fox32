@@ -9,6 +9,7 @@
 
 #include "bus.h"
 #include "cpu.h"
+#include "disk.h"
 #include "framebuffer.h"
 #include "mouse.h"
 #include "screen.h"
@@ -21,12 +22,14 @@
 
 fox32_vm_t vm;
 
+extern disk_controller_t disk_controller;
+
 uint32_t tick_start;
 uint32_t tick_end;
 int ticks = 0;
 bool done = false;
 
-void MainLoop(void);
+void main_loop(void);
 
 int main(int argc, char *argv[]) {
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
@@ -41,6 +44,12 @@ int main(int argc, char *argv[]) {
     //vm.debug = true;
 
     memcpy(vm.memory_rom, fox32rom, sizeof(fox32rom));
+
+    if (argc > 1) {
+        for (int i = 0; i + 1 < argc; i++) {
+            new_disk(argv[i + 1], i);
+        }
+    }
 
     ScreenCreate(
         FRAMEBUFFER_WIDTH, FRAMEBUFFER_HEIGHT,
@@ -59,7 +68,7 @@ int main(int argc, char *argv[]) {
     tick_end = SDL_GetTicks();
 
     while (!done) {
-        MainLoop();
+        main_loop();
 
         tick_end = SDL_GetTicks();
         int delay = 1000/TPS - (tick_end - tick_start);
@@ -73,7 +82,7 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-void MainLoop(void) {
+void main_loop(void) {
     int dt = SDL_GetTicks() - tick_start;
     tick_start = SDL_GetTicks();
     if (!dt)
