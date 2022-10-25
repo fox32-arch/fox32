@@ -1,10 +1,10 @@
 #pragma once
 
-typedef unsigned char key_t;
+typedef unsigned char keycode_t;
 
-key_t key_take(void);
-void key_put(key_t code);
+keycode_t key_take(void);
+void key_put(keycode_t code);
 
-key_t key_convert(int sdlcode);
+keycode_t key_convert(int sdlcode);
 void key_pressed(int sdlcode);
 void key_released(int sdlcode);

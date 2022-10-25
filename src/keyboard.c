@@ -13,13 +13,13 @@
 typedef struct node_s {
     struct node_s *prev;
     struct node_s *next;
-    key_t code;
+    keycode_t code;
 } node_t;
 
 static node_t *head = NULL;
 static node_t *tail = NULL;
 
-key_t key_take(void) {
+keycode_t key_take(void) {
     node_t *node = head;
 
     if (node == NULL) {
@@ -34,11 +34,11 @@ key_t key_take(void) {
         head->prev = NULL;
     }
 
-    key_t code = node->code;
+    keycode_t code = node->code;
     return free(node), code;
 }
 
-void key_put(key_t code) {
+void key_put(keycode_t code) {
     if (code == 0) abort();
 
     node_t *node = malloc(sizeof(node_t));
@@ -56,7 +56,7 @@ void key_put(key_t code) {
     tail = node;
 }
 
-static const key_t key_map[SDL_NUM_SCANCODES] = {
+static const keycode_t key_map[SDL_NUM_SCANCODES] = {
     [SDL_SCANCODE_ESCAPE] = 0x01,
     [SDL_SCANCODE_1] = 0x02,
     [SDL_SCANCODE_KP_1] = 0x02,
@@ -143,7 +143,7 @@ static const key_t key_map[SDL_NUM_SCANCODES] = {
     [SDL_SCANCODE_RIGHT] = 0x6A,
 };
 
-key_t key_convert(int sdlcode) {
+keycode_t key_convert(int sdlcode) {
     if (sdlcode < 0 || sdlcode > SDL_NUM_SCANCODES) abort();
     return key_map[sdlcode];
 }
