@@ -7,6 +7,7 @@ CFILES = src/main.c \
 		src/cpu.c \
 		src/disk.c \
 		src/framebuffer.c \
+		src/keyboard.c \
 		src/mouse.c \
 		src/screen.c
 

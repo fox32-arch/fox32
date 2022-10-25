@@ -11,6 +11,7 @@
 #include "cpu.h"
 #include "disk.h"
 #include "framebuffer.h"
+#include "keyboard.h"
 #include "mouse.h"
 #include "screen.h"
 
@@ -54,8 +55,8 @@ int main(int argc, char *argv[]) {
     ScreenCreate(
         FRAMEBUFFER_WIDTH, FRAMEBUFFER_HEIGHT,
         draw_framebuffer,
-        0,
-        0,
+        key_pressed,
+        key_released,
         mouse_pressed,
         mouse_released,
         mouse_moved
@@ -97,8 +98,7 @@ void main_loop(void) {
         if (i == dt - 1)
             cycles_left += extra_cycles;
 
-        const char *msg = fox32_strerr(fox32_resume(&vm, cycles_left));
-        //puts(msg != NULL ? msg : "NULL");
+        fox32_resume(&vm, cycles_left);
     }
 
     if ((ticks % TPF) == 0) {

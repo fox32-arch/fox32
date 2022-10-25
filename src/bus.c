@@ -12,6 +12,7 @@
 #include "cpu.h"
 #include "disk.h"
 #include "framebuffer.h"
+#include "keyboard.h"
 #include "mouse.h"
 
 extern fox32_vm_t vm;
@@ -73,6 +74,12 @@ int bus_io_read(void *user, uint32_t *value, uint32_t port) {
 
             break;
         };
+
+        case 0x80000500: {
+            *value = (uint32_t) key_take();
+
+            break;
+        }
 
         case 0x80001000 ... 0x80002003: { // disk controller port
             size_t id = port & 0xFF;
