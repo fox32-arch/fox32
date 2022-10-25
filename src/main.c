@@ -92,13 +92,19 @@ void main_loop(void) {
     int cycles_per_tick = FOX32_CPU_HZ / TPS / dt;
     int extra_cycles = FOX32_CPU_HZ / TPS - (cycles_per_tick * dt);
 
+    fox32_err_t error = FOX32_ERR_OK;
+
     for (int i = 0; i < dt; i++) {
         int cycles_left = cycles_per_tick;
 
         if (i == dt - 1)
             cycles_left += extra_cycles;
 
-        fox32_resume(&vm, cycles_left);
+        error = fox32_resume(&vm, cycles_left);
+        if (error != FOX32_ERR_OK) {
+            puts(fox32_strerr(error));
+            fox32_recover(&vm, error);
+        }
     }
 
     if ((ticks % TPF) == 0) {

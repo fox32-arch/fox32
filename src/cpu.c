@@ -11,7 +11,8 @@ static const char *const err_messages[] = {
     "",
     "internal error",
     "breakpoint reached",
-    "access out of bounds",
+    "fault while reading memory",
+    "fault while writing memory",
     "invalid opcode",
     "invalid condition",
     "invalid register",
@@ -61,11 +62,10 @@ enum {
     OP_PUSH  = 0x0A,
     OP_IN    = 0x0B,
     OP_ISE   = 0x0C,
-    OP_IMUL  = 0x0D,
     OP_HALT  = 0x10,
     OP_INC   = 0x11,
-    OP_POW   = 0x12,
     OP_OR    = 0x13,
+    OP_IMUL  = 0x14,
     OP_SRL   = 0x15,
     OP_BCL   = 0x16,
     OP_MOV   = 0x17,
@@ -85,13 +85,13 @@ enum {
     OP_LOOP  = 0x28,
     OP_RLOOP = 0x29,
     OP_RET   = 0x2A,
-    OP_IDIV  = 0x2D,
     OP_DEC   = 0x31,
     OP_REM   = 0x32,
     OP_NOT   = 0x33,
+    OP_IDIV  = 0x34,
+    OP_IREM  = 0x35,
     OP_RTA   = 0x39,
-    OP_RETI  = 0x3A,
-    OP_IREM  = 0x3D
+    OP_RETI  = 0x3A
 };
 
 enum {
@@ -121,11 +121,12 @@ enum {
 };
 
 enum {
-    EX_DEBUGGER,
-    EX_FAULT,
-    EX_ILLEGAL,
-    EX_DIVZERO,
-    EX_BUS
+    EX_DIVZERO  = 256 + 0x00,
+    EX_ILLEGAL  = 256 + 0x01,
+    EX_FAULT_RD = 256 + 0x02,
+    EX_FAULT_WR = 256 + 0x03,
+    EX_DEBUGGER = 256 + 0x04,
+    EX_BUS      = 256 + 0x05
 };
 
 #define SIZE8 1
@@ -204,11 +205,10 @@ static const asm_iinfo_t asm_iinfos[256] = {
     [OP_PUSH ] = { "PUSH ", 1 },
     [OP_IN   ] = { "IN   ", 2 },
     [OP_ISE  ] = { "ISE  ", 0 },
-    [OP_IMUL ] = { "IMUL ", 2 },
     [OP_HALT ] = { "HALT ", 0 },
     [OP_INC  ] = { "INC  ", 1 },
-    [OP_POW  ] = { "POW  ", 2 },
     [OP_OR   ] = { "OR   ", 2 },
+    [OP_IMUL ] = { "IMUL ", 2 },
     [OP_SRL  ] = { "SRL  ", 2 },
     [OP_BCL  ] = { "BCL  ", 2 },
     [OP_MOV  ] = { "MOV  ", 2 },
@@ -228,13 +228,13 @@ static const asm_iinfo_t asm_iinfos[256] = {
     [OP_LOOP ] = { "LOOP ", 1 },
     [OP_RLOOP] = { "RLOOP", 1 },
     [OP_RET  ] = { "RET  ", 0 },
-    [OP_IDIV ] = { "IDIV ", 2 },
     [OP_DEC  ] = { "DEC  ", 1 },
     [OP_REM  ] = { "REM  ", 2 },
     [OP_NOT  ] = { "NOT  ", 1 },
+    [OP_IDIV ] = { "IDIV ", 2 },
+    [OP_IREM ] = { "IREM ", 2 },
     [OP_RTA  ] = { "RTA  ", 2 },
-    [OP_RETI ] = { "RETI ", 0 },
-    [OP_IREM ] = { "IREM ", 2 }
+    [OP_RETI ] = { "RETI ", 0 }
 };
 
 static const asm_iinfo_t *asm_iinfo_get(uint8_t opcode) {
@@ -281,12 +281,12 @@ static const char *const asm_disas_strscondition[8] = {
     "??????"
 };
 
-static const char *const asm_disas_strslocal[34] = {
+static const char *const asm_disas_strslocal[36] = {
     "R0 ", "R1 ", "R2 ", "R3 ", "R4 ", "R5 ", "R6 ", "R7 ",
     "R8 ", "R9 ", "R10", "R11", "R12", "R13", "R14", "R15",
     "R16", "R17", "R18", "R19", "R20", "R21", "R22", "R23",
     "R24", "R25", "R26", "R27", "R28", "R29", "R30", "R31",
-    "RSP", "???"
+    "RSP", "ESP", "RFP", "???"
 };
 
 static void asm_disas_printparam(asm_instr_t instr, const uint8_t **paramsdata, char **buffer, uint8_t prtype) {
@@ -296,8 +296,8 @@ static void asm_disas_printparam(asm_instr_t instr, const uint8_t **paramsdata, 
         uint8_t local = ptr_get8(*paramsdata);
         *paramsdata += SIZE8;
 
-        const char* str_local = asm_disas_strslocal[33];
-        if (local < 33) {
+        const char* str_local = asm_disas_strslocal[35];
+        if (local < 35) {
             str_local = asm_disas_strslocal[local];
         }
 
@@ -310,7 +310,7 @@ static void asm_disas_printparam(asm_instr_t instr, const uint8_t **paramsdata, 
             case SZ_WORD: value =            ptr_get32(*paramsdata); *paramsdata += SIZE32; break;
         }
 
-        count = sprintf(*buffer, "%s %08x", prtype == TY_IMM ? "IMM   " : "IMMPTR", value);
+        count = sprintf(*buffer, "%s %08X", prtype == TY_IMM ? "IMM   " : "IMMPTR", value);
     }
 
     if (count > 0) {
@@ -394,6 +394,12 @@ static uint32_t *vm_findlocal(vm_t *vm, uint8_t local) {
     if (local == FOX32_REGISTER_COUNT) {
         return &vm->pointer_stack;
     }
+    if (local == FOX32_REGISTER_COUNT + 1) {
+        return &vm->pointer_exception_stack;
+    }
+    if (local == FOX32_REGISTER_COUNT + 2) {
+        return &vm->pointer_frame;
+    }
     vm_panic(vm, FOX32_ERR_BADREGISTER);
 }
 
@@ -411,7 +417,7 @@ static uint8_t *vm_findmemory(vm_t *vm, uint32_t address, uint32_t size, bool wr
             return &vm->memory_rom[address];
         }
     }
-    vm_panic(vm, FOX32_ERR_FAULT);
+    if (!write) vm_panic(vm, FOX32_ERR_FAULT_RD); else vm_panic(vm, FOX32_ERR_FAULT_WR);
 }
 
 #define VM_READ_BODY(_ptr_get, _size) \
@@ -974,8 +980,10 @@ static fox32_err_t vm_recover(vm_t *vm, err_t err) {
     switch (err) {
         case FOX32_ERR_DEBUGGER:
             return vm_raise(vm, EX_DEBUGGER);
-        case FOX32_ERR_FAULT:
-            return vm_raise(vm, EX_FAULT);
+        case FOX32_ERR_FAULT_RD:
+            return vm_raise(vm, EX_FAULT_RD);
+        case FOX32_ERR_FAULT_WR:
+            return vm_raise(vm, EX_FAULT_WR);
         case FOX32_ERR_BADOPCODE:
         case FOX32_ERR_BADCONDITION:
         case FOX32_ERR_BADREGISTER:

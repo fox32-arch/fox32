@@ -23,7 +23,8 @@ typedef enum {
     FOX32_ERR_OK,
     FOX32_ERR_INTERNAL,
     FOX32_ERR_DEBUGGER,
-    FOX32_ERR_FAULT,
+    FOX32_ERR_FAULT_RD,
+    FOX32_ERR_FAULT_WR,
     FOX32_ERR_BADOPCODE,
     FOX32_ERR_BADCONDITION,
     FOX32_ERR_BADREGISTER,
@@ -44,6 +45,8 @@ typedef struct {
     uint32_t pointer_instr_mut;
     uint32_t pointer_instr;
     uint32_t pointer_stack;
+    uint32_t pointer_exception_stack;
+    uint32_t pointer_frame;
     uint32_t registers[FOX32_REGISTER_COUNT];
 
     bool flag_zero;
