@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <setjmp.h>
 
-#define FOX32_CPU_HZ 10000000
+#define FOX32_CPU_HZ 33000000
 
 #define FOX32_MEMORY_RAM 0x04000000 //  64 MiB
 #define FOX32_MEMORY_ROM 0x00080000 // 512 KiB

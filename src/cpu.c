@@ -453,6 +453,10 @@ static uint8_t *vm_findmemory(vm_t *vm, uint32_t address, uint32_t size, bool wr
                 vm_panic(vm, FOX32_ERR_FAULT_WR);
             }
         }
+        if (!virtual_page->rw && write) {
+            vm->exception_operand = address;
+            vm_panic(vm, FOX32_ERR_FAULT_WR);
+        }
         uint32_t offset = address & 0x00000FFF;
         uint32_t physical_address = virtual_page->physical_address | offset;
         address_end = physical_address + size;
