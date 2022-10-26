@@ -9,19 +9,14 @@
 
 #include "screen.h"
 
-#define WINDOW_TITLE_UNGRABBED "fox32 emulator"
-#define WINDOW_TITLE_GRABBED "fox32 emulator - strike F1 to uncapture mouse"
+#define SCREEN_ZOOM 1
 
 struct Screen MainScreen;
 
 int WindowWidth = 0;
 int WindowHeight = 0;
 
-int ScreenZoom = 1;
-
 bool ScreenFirstDraw = true;
-
-bool ScreenMouseGrabbed = false;
 
 SDL_Window *ScreenWindow;
 SDL_Renderer *ScreenRenderer;
@@ -30,10 +25,10 @@ SDL_Rect WindowRect;
 
 void ScreenInit() {
     ScreenWindow = SDL_CreateWindow(
-        WINDOW_TITLE_UNGRABBED,
+        "fox32 emulator",
         SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-        (int)(WindowWidth * ScreenZoom),
-        (int)(WindowHeight * ScreenZoom),
+        (int)(WindowWidth * SCREEN_ZOOM),
+        (int)(WindowHeight * SCREEN_ZOOM),
         SDL_WINDOW_HIDDEN
     );
 
@@ -109,23 +104,12 @@ int ScreenProcessEvents() {
             }
 
             case SDL_MOUSEMOTION: {
-                if (ScreenMouseGrabbed) {
-                    if (MainScreen.MouseMoved)
-                        MainScreen.MouseMoved(event.motion.xrel, event.motion.yrel);
-                }
+                if (MainScreen.MouseMoved)
+                    MainScreen.MouseMoved(event.motion.x, event.motion.y);
                 break;
             }
 
             case SDL_MOUSEBUTTONDOWN: {
-                if (!ScreenMouseGrabbed) {
-                    SDL_SetWindowGrab(ScreenWindow, true);
-                    SDL_ShowCursor(false);
-                    SDL_SetWindowTitle(ScreenWindow, WINDOW_TITLE_GRABBED);
-                    SDL_SetRelativeMouseMode(true);
-                    ScreenMouseGrabbed = true;
-                    break;
-                }
-
                 if (MainScreen.MousePressed)
                     MainScreen.MousePressed(event.button.button);
                 break;
@@ -139,15 +123,6 @@ int ScreenProcessEvents() {
             }
 
             case SDL_KEYDOWN:
-                if ((event.key.keysym.scancode == SDL_SCANCODE_F1) && ScreenMouseGrabbed) {
-                    SDL_SetWindowGrab(ScreenWindow, false);
-                    SDL_ShowCursor(true);
-                    SDL_SetWindowTitle(ScreenWindow, WINDOW_TITLE_UNGRABBED);
-                    SDL_SetRelativeMouseMode(false);
-                    ScreenMouseGrabbed = false;
-                    break;
-                }
-
                 if (MainScreen.KeyPressed)
                     MainScreen.KeyPressed(event.key.keysym.scancode);
                 break;

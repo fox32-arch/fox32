@@ -24,7 +24,7 @@ static size_t find_free_tlb_entry_index() {
         }
     }
 
-    return (replacement_index++)&63;
+    return (replacement_index++) & 63;
 }
 
 void set_and_flush_tlb(uint32_t virtual_address) {

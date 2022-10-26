@@ -13,9 +13,9 @@
 
 mouse_t mouse;
 
-void mouse_moved(int dx, int dy) {
-    mouse.x += dx;
-    mouse.y += dy;
+void mouse_moved(int x, int y) {
+    mouse.x = x;
+    mouse.y = y;
 
     if (mouse.x > 0x8000) mouse.x = 0;
     if (mouse.x > 640) mouse.x = 640;
