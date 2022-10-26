@@ -15,13 +15,16 @@ mmu_page_t mmu_tlb[64];
 
 extern fox32_vm_t vm;
 
+uint32_t replacement_index = 0;
+
 static size_t find_free_tlb_entry_index() {
     for (size_t i = 0; i < 64; i++) {
         if (!mmu_tlb[i].present) {
             return i;
         }
     }
-    return 0;
+
+    return (replacement_index++)&63;
 }
 
 void set_and_flush_tlb(uint32_t virtual_address) {

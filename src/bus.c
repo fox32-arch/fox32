@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 
 #include "bus.h"
 #include "cpu.h"
@@ -14,6 +15,9 @@
 #include "framebuffer.h"
 #include "keyboard.h"
 #include "mouse.h"
+
+extern struct timeval rtc_current_time;
+extern uint32_t rtc_uptime;
 
 extern fox32_vm_t vm;
 extern disk_controller_t disk_controller;
@@ -77,6 +81,18 @@ int bus_io_read(void *user, uint32_t *value, uint32_t port) {
 
         case 0x80000500: {
             *value = (uint32_t) key_take();
+
+            break;
+        }
+
+        case 0x80000700 ... 0x80000706: { // RTC port
+            uint8_t setting = port & 0x000000FF;
+            switch (setting) {
+                case 0x06: { // ms since startup
+                    *value = rtc_uptime;
+                    break;
+                }
+            }
 
             break;
         }

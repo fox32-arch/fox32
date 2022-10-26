@@ -2,6 +2,7 @@
 #include <stdnoreturn.h>
 #include <string.h>
 #include <setjmp.h>
+#include <stdlib.h>
 
 #include "cpu.h"
 #include "mmu.h"
@@ -88,6 +89,7 @@ enum {
     OP_LOOP  = 0x28,
     OP_RLOOP = 0x29,
     OP_RET   = 0x2A,
+    OP_INT   = 0x2C,
     OP_TLB   = 0x2D,
     OP_DEC   = 0x31,
     OP_REM   = 0x32,
@@ -96,7 +98,7 @@ enum {
     OP_IREM  = 0x35,
     OP_RTA   = 0x39,
     OP_RETI  = 0x3A,
-    OP_FLP   = 0x3D
+    OP_FLP   = 0x3D,
 };
 
 enum {
@@ -235,6 +237,7 @@ static const asm_iinfo_t asm_iinfos[256] = {
     [OP_LOOP ] = { "LOOP ", 1 },
     [OP_RLOOP] = { "RLOOP", 1 },
     [OP_RET  ] = { "RET  ", 0 },
+    [OP_INT  ] = { "INT  ", 1 },
     [OP_TLB  ] = { "TLB  ", 1 },
     [OP_DEC  ] = { "DEC  ", 1 },
     [OP_REM  ] = { "REM  ", 2 },
@@ -475,8 +478,78 @@ static uint8_t *vm_findmemory(vm_t *vm, uint32_t address, uint32_t size, bool wr
     }
 }
 
+static uint32_t vm_read_across(vm_t *vm, uint32_t address, int size) {
+    uint32_t result = 0;
+
+    int shift = 0;
+
+    // read the first page
+
+    int bytes = 0x1000 - (address&0xFFF);
+    uint8_t *ptr = vm_findmemory(vm, address, bytes, false);
+
+    while (bytes) {
+        result |= (*ptr<<shift);
+        shift += 8;
+
+        ptr++;
+        bytes--;
+    }
+
+    // read the second page
+
+    bytes = (address+size)&0xFFF;
+    address = (address+size)&0xFFFFF000;
+
+    ptr = vm_findmemory(vm, address, bytes, false);
+
+    while (bytes) {
+        result |= (*ptr<<shift);
+        shift += 8;
+
+        ptr++;
+        bytes--;
+    }
+
+    return result;
+}
+
+void vm_write_across(vm_t *vm, uint32_t address, int size, uint32_t value) {
+    // write the first page
+
+    int bytes = 0x1000 - (address&0xFFF);
+    uint8_t *ptr = vm_findmemory(vm, address, bytes, true);
+
+    while (bytes) {
+        *ptr = value&0xFF;
+        value >>= 8;
+
+        ptr++;
+        bytes--;
+    }
+
+    // write the second page
+
+    bytes = (address+size)&0xFFF;
+    address = (address+size)&0xFFFFF000;
+
+    ptr = vm_findmemory(vm, address, bytes, true);
+
+    while (bytes) {
+        *ptr = value&0xFF;
+        value >>= 8;
+
+        ptr++;
+        bytes--;
+    }
+}
+
 #define VM_READ_BODY(_ptr_get, _size) \
-    return _ptr_get(vm_findmemory(vm, address, _size, false));
+    if ((address&0xFFFFF000) == ((address+_size-1)&0xFFFFF000)) {    \
+        return _ptr_get(vm_findmemory(vm, address, _size, false));   \
+    } else {                                                         \
+        return vm_read_across(vm, address, _size);                   \
+    }
 
 static uint8_t vm_read8(vm_t *vm, uint32_t address) {
     VM_READ_BODY(ptr_get8, SIZE8)
@@ -489,7 +562,12 @@ static uint32_t vm_read32(vm_t *vm, uint32_t address) {
 }
 
 #define VM_WRITE_BODY(_ptr_set, _size) \
-    _ptr_set(vm_findmemory(vm, address, _size, true), value);
+    if ((address&0xFFFFF000) == ((address+_size-1)&0xFFFFF000)) {          \
+        return _ptr_set(vm_findmemory(vm, address, _size, true), value);   \
+    } else {                                                               \
+        return vm_write_across(vm, address, _size, value);                 \
+    }
+
 
 static void vm_write8(vm_t *vm, uint32_t address, uint8_t value) {
     VM_WRITE_BODY(ptr_set8, SIZE8)
@@ -502,7 +580,8 @@ static void vm_write32(vm_t *vm, uint32_t address, uint32_t value) {
 }
 
 #define VM_PUSH_BODY(_vm_write, _size) \
-    _vm_write(vm, vm->pointer_stack -= _size, value);
+    _vm_write(vm, vm->pointer_stack - _size, value); \
+    vm->pointer_stack -= _size;
 
 static void vm_push8(vm_t *vm, uint8_t value) {
     VM_PUSH_BODY(vm_write8, SIZE8)
@@ -515,8 +594,9 @@ static void vm_push32(vm_t *vm, uint32_t value) {
 }
 
 #define VM_POP_BODY(_vm_read, _size)                 \
-    uint32_t pointer_stack_prev = vm->pointer_stack; \
-    return _vm_read(vm, (vm->pointer_stack += _size, pointer_stack_prev));
+    uint32_t result = _vm_read(vm, vm->pointer_stack); \
+    vm->pointer_stack += _size; \
+    return result;
 
 static uint8_t vm_pop8(vm_t *vm) {
     VM_POP_BODY(vm_read8, SIZE8)
@@ -872,6 +952,9 @@ static void vm_execute(vm_t *vm) {
             VM_PRELUDE_0();
             vm_flags_set(vm, vm_pop8(vm));
             vm->pointer_instr_mut = vm_pop32(vm);
+            if (vm->flag_swap_sp) {
+                vm->pointer_stack = vm_pop32(vm);
+            }
             break;
         };
 
@@ -997,6 +1080,14 @@ static void vm_execute(vm_t *vm) {
             vm->mmu_enabled = false;
             break;
         };
+        case OP(SZ_WORD, OP_INT): {
+            VM_PRELUDE_1(SIZE32);
+            uint32_t intr = vm_source32(vm, instr.source);
+            vm->pointer_instr = vm->pointer_instr_mut;
+            fox32_raise(vm, intr);
+            vm->pointer_instr_mut = vm->pointer_instr;
+            break;
+        };
         case OP(SZ_WORD, OP_TLB): {
             VM_PRELUDE_1(SIZE32);
             set_and_flush_tlb(vm_source32(vm, instr.source));
@@ -1022,14 +1113,18 @@ static err_t vm_step(vm_t *vm) {
     vm_execute(vm);
     return FOX32_ERR_OK;
 }
-static err_t vm_resume(vm_t *vm, uint32_t count) {
+static err_t vm_resume(vm_t *vm, uint32_t count, uint32_t *executed) {
     if (setjmp(vm->panic_jmp) != 0) {
         return vm->halted = true, vm->panic_err;
     }
+
+    vm->halted = false;
+
     uint32_t remaining = count;
     while (!vm->halted && remaining > 0) {
         vm_execute(vm);
         remaining -= 1;
+        *executed += 1;
     }
     return FOX32_ERR_OK;
 }
@@ -1143,8 +1238,8 @@ void fox32_init(fox32_vm_t *vm) {
 fox32_err_t fox32_step(fox32_vm_t *vm) {
     return vm_step(vm);
 }
-fox32_err_t fox32_resume(fox32_vm_t *vm, uint32_t count) {
-    return vm_resume(vm, count);
+fox32_err_t fox32_resume(fox32_vm_t *vm, uint32_t count, uint32_t *executed) {
+    return vm_resume(vm, count, executed);
 }
 fox32_err_t fox32_raise(fox32_vm_t *vm, uint16_t vector) {
     return vm_raise(vm, vector);

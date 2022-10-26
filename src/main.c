@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 
 #include "bus.h"
 #include "cpu.h"
@@ -29,6 +30,9 @@ uint32_t tick_start;
 uint32_t tick_end;
 int ticks = 0;
 bool done = false;
+
+struct timeval rtc_current_time;
+uint32_t rtc_uptime;
 
 void main_loop(void);
 
@@ -95,17 +99,26 @@ void main_loop(void) {
     fox32_err_t error = FOX32_ERR_OK;
 
     for (int i = 0; i < dt; i++) {
+        rtc_uptime += 1;
+        gettimeofday(&rtc_current_time, 0);
+
         int cycles_left = cycles_per_tick;
 
         if (i == dt - 1)
             cycles_left += extra_cycles;
 
-        error = fox32_resume(&vm, cycles_left);
-        if (error != FOX32_ERR_OK) {
-            //puts(fox32_strerr(error));
-            error = fox32_recover(&vm, error);
-            //if (error != FOX32_ERR_OK)
+        while (cycles_left > 0) {
+            uint32_t executed = 0;
+
+            error = fox32_resume(&vm, cycles_left, &executed);
+            if (error != FOX32_ERR_OK) {
                 //puts(fox32_strerr(error));
+                error = fox32_recover(&vm, error);
+                if (error != FOX32_ERR_OK)
+                    break;
+            }
+
+            cycles_left -= executed;
         }
     }
 

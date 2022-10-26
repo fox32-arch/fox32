@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <setjmp.h>
 
-#define FOX32_CPU_HZ 33000000
+#define FOX32_CPU_HZ 10000000
 
 #define FOX32_MEMORY_RAM 0x04000000 //  64 MiB
 #define FOX32_MEMORY_ROM 0x00080000 // 512 KiB
@@ -77,7 +77,7 @@ typedef struct {
 void fox32_init(fox32_vm_t *vm);
 
 fox32_err_t fox32_step(fox32_vm_t *vm);
-fox32_err_t fox32_resume(fox32_vm_t *vm, uint32_t count);
+fox32_err_t fox32_resume(fox32_vm_t *vm, uint32_t count, uint32_t *executed);
 
 fox32_err_t fox32_raise(fox32_vm_t *vm, uint16_t vector);
 fox32_err_t fox32_recover(fox32_vm_t *vm, fox32_err_t err);
