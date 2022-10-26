@@ -47,18 +47,24 @@ typedef struct {
     uint32_t pointer_stack;
     uint32_t pointer_exception_stack;
     uint32_t pointer_frame;
+    uint32_t pointer_page_directory;
     uint32_t registers[FOX32_REGISTER_COUNT];
 
     bool flag_zero;
     bool flag_carry;
     bool flag_interrupt;
+    bool flag_swap_sp;
 
     bool halted;
 
     bool debug;
 
+    bool mmu_enabled;
+
     jmp_buf panic_jmp;
     fox32_err_t panic_err;
+
+    uint32_t exception_operand;
 
     void *io_user;
     fox32_io_read_t *io_read;

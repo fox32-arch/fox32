@@ -8,6 +8,7 @@ CFILES = src/main.c \
 		src/disk.c \
 		src/framebuffer.c \
 		src/keyboard.c \
+		src/mmu.c \
 		src/mouse.c \
 		src/screen.c
 

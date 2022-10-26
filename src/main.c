@@ -102,8 +102,10 @@ void main_loop(void) {
 
         error = fox32_resume(&vm, cycles_left);
         if (error != FOX32_ERR_OK) {
-            puts(fox32_strerr(error));
-            fox32_recover(&vm, error);
+            //puts(fox32_strerr(error));
+            error = fox32_recover(&vm, error);
+            //if (error != FOX32_ERR_OK)
+                //puts(fox32_strerr(error));
         }
     }
 

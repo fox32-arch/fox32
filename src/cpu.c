@@ -4,6 +4,7 @@
 #include <setjmp.h>
 
 #include "cpu.h"
+#include "mmu.h"
 
 typedef fox32_err_t err_t;
 
@@ -62,6 +63,7 @@ enum {
     OP_PUSH  = 0x0A,
     OP_IN    = 0x0B,
     OP_ISE   = 0x0C,
+    OP_MSE   = 0x0D,
     OP_HALT  = 0x10,
     OP_INC   = 0x11,
     OP_OR    = 0x13,
@@ -74,6 +76,7 @@ enum {
     OP_POP   = 0x1A,
     OP_OUT   = 0x1B,
     OP_ICL   = 0x1C,
+    OP_MCL   = 0x1D,
     OP_BRK   = 0x20,
     OP_SUB   = 0x21,
     OP_DIV   = 0x22,
@@ -85,13 +88,15 @@ enum {
     OP_LOOP  = 0x28,
     OP_RLOOP = 0x29,
     OP_RET   = 0x2A,
+    OP_TLB   = 0x2D,
     OP_DEC   = 0x31,
     OP_REM   = 0x32,
     OP_NOT   = 0x33,
     OP_IDIV  = 0x34,
     OP_IREM  = 0x35,
     OP_RTA   = 0x39,
-    OP_RETI  = 0x3A
+    OP_RETI  = 0x3A,
+    OP_FLP   = 0x3D
 };
 
 enum {
@@ -205,6 +210,7 @@ static const asm_iinfo_t asm_iinfos[256] = {
     [OP_PUSH ] = { "PUSH ", 1 },
     [OP_IN   ] = { "IN   ", 2 },
     [OP_ISE  ] = { "ISE  ", 0 },
+    [OP_MSE  ] = { "MSE  ", 0 },
     [OP_HALT ] = { "HALT ", 0 },
     [OP_INC  ] = { "INC  ", 1 },
     [OP_OR   ] = { "OR   ", 2 },
@@ -217,6 +223,7 @@ static const asm_iinfo_t asm_iinfos[256] = {
     [OP_POP  ] = { "POP  ", 1 },
     [OP_OUT  ] = { "OUT  ", 2 },
     [OP_ICL  ] = { "ICL  ", 0 },
+    [OP_MCL  ] = { "MCL  ", 0 },
     [OP_BRK  ] = { "BRK  ", 0 },
     [OP_SUB  ] = { "SUB  ", 2 },
     [OP_DIV  ] = { "DIV  ", 2 },
@@ -228,13 +235,15 @@ static const asm_iinfo_t asm_iinfos[256] = {
     [OP_LOOP ] = { "LOOP ", 1 },
     [OP_RLOOP] = { "RLOOP", 1 },
     [OP_RET  ] = { "RET  ", 0 },
+    [OP_TLB  ] = { "TLB  ", 1 },
     [OP_DEC  ] = { "DEC  ", 1 },
     [OP_REM  ] = { "REM  ", 2 },
     [OP_NOT  ] = { "NOT  ", 1 },
     [OP_IDIV ] = { "IDIV ", 2 },
     [OP_IREM ] = { "IREM ", 2 },
     [OP_RTA  ] = { "RTA  ", 2 },
-    [OP_RETI ] = { "RETI ", 0 }
+    [OP_RETI ] = { "RETI ", 0 },
+    [OP_FLP  ] = { "FLP  ", 0 }
 };
 
 static const asm_iinfo_t *asm_iinfo_get(uint8_t opcode) {
@@ -351,6 +360,7 @@ static void vm_init(vm_t *vm) {
     vm->pointer_instr = FOX32_POINTER_DEFAULT_INSTR;
     vm->pointer_stack = FOX32_POINTER_DEFAULT_STACK;
     vm->halted = true;
+    vm->mmu_enabled = false;
     vm->io_user = NULL;
     vm->io_read = io_read_default;
     vm->io_write = io_write_default;
@@ -379,12 +389,16 @@ static void vm_io_write(vm_t *vm, uint32_t port, uint32_t value) {
 }
 
 static uint8_t vm_flags_get(vm_t *vm) {
-    return (((uint8_t) vm->flag_interrupt) << 2) | (((uint8_t) vm->flag_carry) << 1) | ((uint8_t) vm->flag_zero);
+    return (((uint8_t) vm->flag_swap_sp) << 3) |
+           (((uint8_t) vm->flag_interrupt) << 2) |
+           (((uint8_t) vm->flag_carry) << 1) |
+           ((uint8_t) vm->flag_zero);
 }
 static void vm_flags_set(vm_t *vm, uint8_t flags) {
     vm->flag_zero = (flags & 1) != 0;
     vm->flag_carry = (flags & 2) != 0;
     vm->flag_interrupt = (flags & 4) != 0;
+    vm->flag_swap_sp = (flags & 8) != 0;
 }
 
 static uint32_t *vm_findlocal(vm_t *vm, uint8_t local) {
@@ -405,19 +419,60 @@ static uint32_t *vm_findlocal(vm_t *vm, uint8_t local) {
 
 static uint8_t *vm_findmemory(vm_t *vm, uint32_t address, uint32_t size, bool write) {
     uint32_t address_end = address + size;
-    if (address_end > address) {
-        if (address_end <= FOX32_MEMORY_RAM) {
-            return &vm->memory_ram[address];
+    if (!vm->mmu_enabled) {
+        if (address_end > address) {
+            if (address_end <= FOX32_MEMORY_RAM) {
+                return &vm->memory_ram[address];
+            }
+            if (
+                !write &&
+                (address >= FOX32_MEMORY_ROM_START) &&
+                (address -= FOX32_MEMORY_ROM_START) + size <= FOX32_MEMORY_ROM
+            ) {
+                return &vm->memory_rom[address];
+            }
         }
-        if (
-            !write &&
-            (address >= FOX32_MEMORY_ROM_START) &&
-            (address -= FOX32_MEMORY_ROM_START) + size <= FOX32_MEMORY_ROM
-        ) {
-            return &vm->memory_rom[address];
+        if (!write) {
+            vm->exception_operand = address;
+            vm_panic(vm, FOX32_ERR_FAULT_RD);
+        } else {
+            vm->exception_operand = address;
+            vm_panic(vm, FOX32_ERR_FAULT_WR);
+        }
+    } else {
+        mmu_page_t *virtual_page = get_present_page(address);
+        if (virtual_page == NULL) {
+            if (!write) {
+                vm->exception_operand = address;
+                vm_panic(vm, FOX32_ERR_FAULT_RD);
+            } else {
+                vm->exception_operand = address;
+                vm_panic(vm, FOX32_ERR_FAULT_WR);
+            }
+        }
+        uint32_t offset = address & 0x00000FFF;
+        uint32_t physical_address = virtual_page->physical_address | offset;
+        address_end = physical_address + size;
+        if (address_end > physical_address) {
+            if (address_end <= FOX32_MEMORY_RAM) {
+                return &vm->memory_ram[physical_address];
+            }
+            if (
+                !write &&
+                (physical_address >= FOX32_MEMORY_ROM_START) &&
+                (physical_address -= FOX32_MEMORY_ROM_START) + size <= FOX32_MEMORY_ROM
+            ) {
+                return &vm->memory_rom[physical_address];
+            }
+        }
+        if (!write) {
+            vm->exception_operand = address;
+            vm_panic(vm, FOX32_ERR_FAULT_RD);
+        } else {
+            vm->exception_operand = address;
+            vm_panic(vm, FOX32_ERR_FAULT_WR);
         }
     }
-    if (!write) vm_panic(vm, FOX32_ERR_FAULT_RD); else vm_panic(vm, FOX32_ERR_FAULT_WR);
 }
 
 #define VM_READ_BODY(_ptr_get, _size) \
@@ -723,6 +778,7 @@ static void vm_skipparam(vm_t *vm, uint32_t size, uint8_t prtype) {
 }
 
 #define VM_IMPL_CMP(_size, _type, _vm_source) { \
+    VM_PRELUDE_0();                             \
     _type a = _vm_source(vm, instr.source);     \
     _type b = _vm_source(vm, instr.target);     \
     _type x;                                    \
@@ -732,6 +788,7 @@ static void vm_skipparam(vm_t *vm, uint32_t size, uint8_t prtype) {
 }
 
 #define VM_IMPL_BTS(_size, _type, _vm_source) { \
+    VM_PRELUDE_2(_size);                        \
     _type a = _vm_source(vm, instr.source);     \
     _type b = _vm_source(vm, instr.target);     \
     _type x = b & (1 << a);                     \
@@ -751,7 +808,7 @@ static void vm_debug(vm_t *vm, asm_instr_t instr, uint32_t address) {
     char buffer[128] = {};
     asm_disas_print(instr, iinfo, params_data, buffer);
 
-    printf("%08x %s\n", address, buffer);
+    printf("%08X %s\n", address, buffer);
 }
 
 static void vm_execute(vm_t *vm) {
@@ -930,6 +987,27 @@ static void vm_execute(vm_t *vm) {
         case OP(SZ_HALF, OP_BTS): VM_IMPL_BTS(SIZE16, uint16_t, vm_source16);
         case OP(SZ_WORD, OP_BTS): VM_IMPL_BTS(SIZE32, uint32_t, vm_source32);
 
+        case OP(SZ_WORD, OP_MSE): {
+            VM_PRELUDE_0();
+            vm->mmu_enabled = true;
+            break;
+        };
+        case OP(SZ_WORD, OP_MCL): {
+            VM_PRELUDE_0();
+            vm->mmu_enabled = false;
+            break;
+        };
+        case OP(SZ_WORD, OP_TLB): {
+            VM_PRELUDE_1(SIZE32);
+            set_and_flush_tlb(vm_source32(vm, instr.source));
+            break;
+        };
+        case OP(SZ_WORD, OP_FLP): {
+            VM_PRELUDE_1(SIZE32);
+            flush_single_page(vm_source32(vm, instr.source));
+            break;
+        };
+
         default:
             vm_panic(vm, FOX32_ERR_BADOPCODE);
     }
@@ -957,17 +1035,39 @@ static err_t vm_resume(vm_t *vm, uint32_t count) {
 }
 
 static fox32_err_t vm_raise(vm_t *vm, uint16_t vector) {
-    if (!vm->flag_interrupt) {
+    if (!vm->flag_interrupt && vector < 256) {
         return FOX32_ERR_NOINTERRUPTS;
     }
     if (setjmp(vm->panic_jmp) != 0) {
         return vm->panic_err;
     }
 
-    uint32_t pointer_handler = vm_read32(vm, SIZE32 * (uint32_t) vector);
+    uint32_t pointer_handler =
+        vm->memory_ram[SIZE32 * (uint32_t) vector] |
+        vm->memory_ram[SIZE32 * (uint32_t) vector + 1] <<  8 |
+        vm->memory_ram[SIZE32 * (uint32_t) vector + 2] << 16 |
+        vm->memory_ram[SIZE32 * (uint32_t) vector + 3] << 24;
 
-    vm_push32(vm, vm->pointer_instr);
-    vm_push8(vm, vm_flags_get(vm));
+    if (vm->flag_swap_sp) {
+        uint32_t old_stack_pointer = vm->pointer_stack;
+        vm->pointer_stack = vm->pointer_exception_stack;
+        vm_push32(vm, old_stack_pointer);
+        vm_push32(vm, vm->pointer_instr);
+        vm_push8(vm, vm_flags_get(vm));
+        vm->flag_swap_sp = false;
+    } else {
+        vm_push32(vm, vm->pointer_instr);
+        vm_push8(vm, vm_flags_get(vm));
+    }
+
+    if (vector >= 256) {
+        // if this is an exception, push the operand
+        vm_push32(vm, vm->exception_operand);
+        vm->exception_operand = 0;
+    } else {
+        // if this is an interrupt, push the vector
+        vm_push32(vm, (uint32_t) vector);
+    }
 
     vm->pointer_instr = pointer_handler;
     vm->halted = true;
