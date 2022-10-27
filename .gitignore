@@ -1,4 +1,9 @@
 **/.vscode/
+
+fox32.rom
+fox32rom.h
+
 fox32
+
 fox32.exe
 SDL2.dll
