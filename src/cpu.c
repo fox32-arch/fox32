@@ -521,11 +521,11 @@ static uint32_t vm_read_across(vm_t *vm, uint32_t address, int size) {
 void vm_write_across(vm_t *vm, uint32_t address, int size, uint32_t value) {
     // write the first page
 
-    int bytes = 0x1000 - (address&0xFFF);
+    int bytes = 0x1000 - (address & 0x00000FFF);
     uint8_t *ptr = vm_findmemory(vm, address, bytes, true);
 
     while (bytes) {
-        *ptr = value&0xFF;
+        *ptr = value & 0xFF;
         value >>= 8;
 
         ptr++;
@@ -534,13 +534,13 @@ void vm_write_across(vm_t *vm, uint32_t address, int size, uint32_t value) {
 
     // write the second page
 
-    bytes = (address+size)&0xFFF;
-    address = (address+size)&0xFFFFF000;
+    bytes = (address + size) & 0x00000FFF;
+    address = (address + size) & 0xFFFFF000;
 
     ptr = vm_findmemory(vm, address, bytes, true);
 
     while (bytes) {
-        *ptr = value&0xFF;
+        *ptr = value & 0xFF;
         value >>= 8;
 
         ptr++;
@@ -549,10 +549,10 @@ void vm_write_across(vm_t *vm, uint32_t address, int size, uint32_t value) {
 }
 
 #define VM_READ_BODY(_ptr_get, _size) \
-    if ((address&0xFFFFF000) == ((address+_size-1)&0xFFFFF000)) {    \
-        return _ptr_get(vm_findmemory(vm, address, _size, false));   \
-    } else {                                                         \
-        return vm_read_across(vm, address, _size);                   \
+    if ((address & 0xFFFFF000) == ((address + _size - 1) & 0xFFFFF000)) { \
+        return _ptr_get(vm_findmemory(vm, address, _size, false));        \
+    } else {                                                              \
+        return vm_read_across(vm, address, _size);                        \
     }
 
 static uint8_t vm_read8(vm_t *vm, uint32_t address) {
@@ -566,10 +566,10 @@ static uint32_t vm_read32(vm_t *vm, uint32_t address) {
 }
 
 #define VM_WRITE_BODY(_ptr_set, _size) \
-    if ((address&0xFFFFF000) == ((address+_size-1)&0xFFFFF000)) {          \
-        return _ptr_set(vm_findmemory(vm, address, _size, true), value);   \
-    } else {                                                               \
-        return vm_write_across(vm, address, _size, value);                 \
+    if ((address & 0xFFFFF000) == ((address + _size - 1) & 0xFFFFF000)) { \
+        return _ptr_set(vm_findmemory(vm, address, _size, true), value);  \
+    } else {                                                              \
+        return vm_write_across(vm, address, _size, value);                \
     }
 
 
