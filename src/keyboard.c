@@ -95,6 +95,7 @@ static const keycode_t key_map[SDL_NUM_SCANCODES] = {
     [SDL_SCANCODE_LEFTBRACKET] = 0x1A,
     [SDL_SCANCODE_RIGHTBRACKET] = 0x1B,
     [SDL_SCANCODE_RETURN] = 0x1C,
+    [SDL_SCANCODE_KP_ENTER] = 0x1C,
     [SDL_SCANCODE_LCTRL] = 0x1D,
     [SDL_SCANCODE_A] = 0x1E,
     [SDL_SCANCODE_S] = 0x1F,
@@ -144,14 +145,16 @@ static const keycode_t key_map[SDL_NUM_SCANCODES] = {
 };
 
 keycode_t key_convert(int sdlcode) {
-    if (sdlcode < 0 || sdlcode > SDL_NUM_SCANCODES) abort();
+    if (sdlcode < 0 || sdlcode > SDL_NUM_SCANCODES) return 0;
     return key_map[sdlcode];
 }
 
 void key_pressed(int sdlcode) {
-    key_put(key_convert(sdlcode));
+    keycode_t code = key_convert(sdlcode);
+    if (code) key_put(code);
 }
 
 void key_released(int sdlcode) {
-    key_put(key_convert(sdlcode) | 0x80);
+    keycode_t code = key_convert(sdlcode) | 0x80;
+    if (code) key_put(code);
 }
