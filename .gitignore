@@ -1,6 +1,4 @@
 **/.vscode/
-
-**/debug/
-**/target/
-
-src/fox32.rom
+fox32
+fox32.exe
+SDL2.dll
