@@ -135,7 +135,7 @@ void main_loop(void) {
 
             error = fox32_resume(&vm, cycles_left, &executed);
             if (error != FOX32_ERR_OK) {
-                //puts(fox32_strerr(error));
+                if (vm.debug) puts(fox32_strerr(error));
                 error = fox32_recover(&vm, error);
                 if (error != FOX32_ERR_OK)
                     break;
