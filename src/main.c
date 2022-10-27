@@ -35,6 +35,7 @@ struct timeval rtc_current_time;
 uint32_t rtc_uptime;
 
 void main_loop(void);
+void load_rom(const char *filename);
 
 int main(int argc, char *argv[]) {
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
@@ -48,13 +49,33 @@ int main(int argc, char *argv[]) {
     vm.io_read = bus_io_read;
     vm.io_write = bus_io_write;
     vm.halted = false;
-    //vm.debug = true;
+    vm.debug = false;
 
     memcpy(vm.memory_rom, fox32rom, sizeof(fox32rom));
 
-    if (argc > 1) {
-        for (int i = 0; i + 1 < argc; i++) {
-            new_disk(argv[i + 1], i);
+    size_t disk_id = 0;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--disk") == 0) {
+            if (i + 1 < argc) {
+                new_disk(argv[i + 1], disk_id++);
+                i++;
+            } else {
+                fprintf(stderr, "no disk image specified\n");
+                return 1;
+            }
+        } else if (strcmp(argv[i], "--rom") == 0) {
+            if (i + 1 < argc) {
+                load_rom(argv[i + 1]);
+                i++;
+            } else {
+                fprintf(stderr, "no rom image specified\n");
+                return 1;
+            }
+        } else if (strcmp(argv[i], "--debug") == 0) {
+            vm.debug = true;
+        } else {
+            fprintf(stderr, "unrecognized option %s\n", argv[i]);
+            return 1;
         }
     }
 
@@ -133,4 +154,18 @@ void main_loop(void) {
     done = ScreenProcessEvents();
 
     ticks++;
+}
+
+void load_rom(const char *filename) {
+    FILE *rom;
+    rom = fopen(filename, "r");
+
+    if (!rom) {
+        fprintf(stderr, "couldn't open ROM file %s\n", filename);
+        return;
+    }
+
+    printf("using %s as boot ROM\n", filename);
+    fread(&vm.memory_rom, sizeof(fox32rom), 1, rom);
+    fclose(rom);
 }

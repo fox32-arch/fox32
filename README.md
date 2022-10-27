@@ -20,7 +20,12 @@ Download the latest release or commit of [**fox32rom**](https://github.com/fox32
 
 ### Usage
 
-Passing files as arguments will mount those files as disks, in the order that the arguments were passed. The most common use case is passing the [**fox32os**](https://github.com/fox32-arch/fox32os) disk image as the first argument: `./fox32 fox32os.img`
+The following arguments are valid:
+- `--disk <file>`: mount the specified file as a disk
+- `--rom <file>`: use the specified file as the boot ROM. if this argument is not specified then the embedded copy of **fox32rom** is used
+- `--debug`: print a disassembly of each instruction as it runs
+
+The most common use case is passing the [**fox32os**](https://github.com/fox32-arch/fox32os) disk image as the first disk: `./fox32 --disk fox32os.img`
 
 See [encoding.md](docs/encoding.md) for information about the instruction set.
 
