@@ -4,7 +4,7 @@
 
 **fox32** (stylized in all lowercase) is a 32 bit fantasy computer architecture, with a custom operating system and user interface inspired by various classic computers.
 
-![Screenshot of fox32os](docs/screenshots/screenshot_launcher.png)
+![Screenshot of fox32os](docs/screenshots/fox32os-terminal.png)
 
 ## Getting Started
 
@@ -12,15 +12,15 @@
 
 Stable releases are available on the [Releases page](https://github.com/fox32-arch/fox32/releases).
 
-Prebuilt binaries of the latest commit are also available on the [GitHub Actions page](https://github.com/fox32-arch/fox32/actions).
+Prebuilt Linux binaries of the latest commit are also available on the [GitHub Actions page](https://github.com/fox32-arch/fox32/actions).
 
 ### Building
 
-Download the latest release of [**fox32rom**](https://github.com/fox32-arch/fox32rom/releases), and place the downloaded `fox32.rom` file into the `src` directory. Then simply run `cargo build --release`. The resulting binary will be saved as `target/release/fox32`. You can also run `cargo run --release` if you want to run it directly.
+Download the latest release or commit of [**fox32rom**](https://github.com/fox32-arch/fox32rom), and place the downloaded `fox32.rom` file into the root directory of this repo. Then simply run `make`. The resulting binary will be saved as `fox32`.
 
 ### Usage
 
-Passing files as arguments will mount those files as disks, in the order that the arguments were passed. The most common use case is passing the [**fox32os**](https://github.com/fox32-arch/fox32os) disk image as the first argument: `fox32 fox32os.img`
+Passing files as arguments will mount those files as disks, in the order that the arguments were passed. The most common use case is passing the [**fox32os**](https://github.com/fox32-arch/fox32os) disk image as the first argument: `./fox32 fox32os.img`
 
 See [encoding.md](docs/encoding.md) for information about the instruction set.
 
