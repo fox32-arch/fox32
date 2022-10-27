@@ -206,7 +206,9 @@ int bus_io_write(void *user, uint32_t value, uint32_t port) {
                     break;
                 };
                 case 0x40: {
-                    // TODO: write specified disk sector from memory
+                    // write specified disk sector from memory
+                    set_disk_sector(id, value);
+                    write_disk_from_memory(id);
                     break;
                 };
                 case 0x50: {

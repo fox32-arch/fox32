@@ -52,3 +52,8 @@ size_t read_disk_into_memory(size_t id) {
     if (id > 3) { puts("attempting to access disk with ID > 3\n"); return 0; }
     return fread(&vm.memory_ram[disk_controller.buffer_pointer], 1, 512, disk_controller.disks[id].file);
 }
+
+size_t write_disk_from_memory(size_t id) {
+    if (id > 3) { puts("attempting to access disk with ID > 3\n"); return 0; }
+    return fwrite(&vm.memory_ram[disk_controller.buffer_pointer], 1, 512, disk_controller.disks[id].file);
+}

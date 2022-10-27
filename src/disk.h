@@ -16,3 +16,4 @@ void remove_disk(size_t id);
 uint64_t get_disk_size(size_t id);
 void set_disk_sector(size_t id, uint64_t sector);
 size_t read_disk_into_memory(size_t id);
+size_t write_disk_from_memory(size_t id);
