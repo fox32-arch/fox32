@@ -16,7 +16,8 @@ FOX32ROM_IN = fox32.rom
 FOX32ROM_OUT = fox32rom.h
 
 $(TARGET): $(CFILES) $(FOX32ROM_IN)
-	xxd -i -n fox32rom $(FOX32ROM_IN) $(FOX32ROM_OUT)
+	xxd -i $(FOX32ROM_IN) $(FOX32ROM_OUT)
+	sed -i -e 's/fox32_rom/fox32rom/' fox32rom.h
 	$(CC) -o $@ $(filter %.c, $^) $(CFLAGS)
 
 clean:

@@ -150,8 +150,6 @@ struct SDL_Texture *ScreenGetTexture(struct Screen *screen) {
         screen->Height
     );
 
-    SDL_SetTextureScaleMode(screen->Texture, SDL_ScaleModeNearest);
-
     return screen->Texture;
 }
 

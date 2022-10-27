@@ -1,0 +1,40 @@
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+name: fox32 Unstable - Linux
+
+jobs:
+  fox32-unstable-linux:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Download latest fox32rom artifact
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          repo: fox32-arch/fox32rom
+          workflow: fox32rom-unstable.yml
+          workflow_conclusion: success
+
+      - name: Move fox32.rom into the root folder
+        run: |
+          mv fox32.rom/ download/
+          cp download/fox32.rom ./fox32.rom
+
+      - name: Install libsdl2-dev and vim
+        run: |
+          sudo apt update
+          sudo apt install -y libsdl2-dev vim
+
+      - name: Build
+        run: make
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: fox32
+          path: fox32
