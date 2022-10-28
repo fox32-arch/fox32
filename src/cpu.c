@@ -924,6 +924,7 @@ static void vm_execute(vm_t *vm) {
         case OP(SZ_HALF, OP_BRK):
         case OP(SZ_WORD, OP_BRK): {
             VM_PRELUDE_0();
+            vm->pointer_instr = vm->pointer_instr_mut;
             vm_panic(vm, FOX32_ERR_DEBUGGER);
             break;
         };
