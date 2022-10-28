@@ -24,6 +24,7 @@
 
 fox32_vm_t vm;
 
+extern bool bus_requests_exit;
 extern disk_controller_t disk_controller;
 
 uint32_t tick_start;
@@ -95,7 +96,7 @@ int main(int argc, char *argv[]) {
     tick_start = SDL_GetTicks();
     tick_end = SDL_GetTicks();
 
-    while (!done) {
+    while (!done && !bus_requests_exit) {
         main_loop();
 
         tick_end = SDL_GetTicks();

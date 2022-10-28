@@ -16,9 +16,11 @@
 #include "keyboard.h"
 #include "mouse.h"
 
+bool bus_requests_exit = false;
+
 extern struct timeval rtc_current_time;
 extern uint32_t rtc_uptime;
-
+;
 extern fox32_vm_t vm;
 extern disk_controller_t disk_controller;
 extern mouse_t mouse;
@@ -219,6 +221,12 @@ int bus_io_write(void *user, uint32_t value, uint32_t port) {
             }
 
             break;
+        };
+
+        case 0x80010000: { // power control port
+            if (value == 0) {
+                bus_requests_exit = true;
+            }
         };
     }
 
