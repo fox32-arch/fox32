@@ -1,4 +1,4 @@
-#include <SDL2/SDL.h>
+#include <SDL.h>
 #include <getopt.h>
 #include <stdarg.h>
 #include <stdbool.h>
