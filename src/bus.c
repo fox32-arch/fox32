@@ -68,7 +68,7 @@ int bus_io_read(void *user, uint32_t *value, uint32_t port) {
                     // button states
                     if (mouse.clicked) *value |= 0b001;
                     if (mouse.released) *value |= 0b010;
-                    if (mouse.held) *value |= 0b100; else *value &= !0b100;
+                    if (mouse.held) *value |= 0b100; else *value &= ~(0b100);
                     break;
                 };
                 case 0x01: {
