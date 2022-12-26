@@ -93,11 +93,11 @@ int bus_io_read(void *user, uint32_t *value, uint32_t port) {
             struct tm *now = localtime(&rtc_time);
             switch (setting) {
                 case 0x00: { // year
-                    *value = now->tm_year;
+                    *value = now->tm_year + 1900;
                     break;
                 }
                 case 0x01: { // month
-                    *value = now->tm_mon;
+                    *value = now->tm_mon + 1;
                     break;
                 }
                 case 0x02: { // day
