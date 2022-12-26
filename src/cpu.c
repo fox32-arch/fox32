@@ -1131,8 +1131,6 @@ static err_t vm_resume(vm_t *vm, uint32_t count, uint32_t *executed) {
         remaining -= 1;
         *executed += 1;
     }
-    if (vm->halted)
-        *executed = count;
     return FOX32_ERR_OK;
 }
 
@@ -1172,6 +1170,7 @@ static fox32_err_t vm_raise(vm_t *vm, uint16_t vector) {
     }
 
     vm->pointer_instr = pointer_handler;
+    vm->halted = true;
     vm->flag_interrupt = false;
 
     return FOX32_ERR_OK;
