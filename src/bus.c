@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+#include <time.h>
 
 #include "bus.h"
 #include "cpu.h"
@@ -18,9 +19,9 @@
 
 bool bus_requests_exit = false;
 
-extern struct timeval rtc_current_time;
+extern time_t rtc_time;
 extern uint32_t rtc_uptime;
-;
+
 extern fox32_vm_t vm;
 extern disk_controller_t disk_controller;
 extern mouse_t mouse;
@@ -89,7 +90,32 @@ int bus_io_read(void *user, uint32_t *value, uint32_t port) {
 
         case 0x80000700 ... 0x80000706: { // RTC port
             uint8_t setting = port & 0x000000FF;
+            struct tm *now = localtime(&rtc_time);
             switch (setting) {
+                case 0x00: { // year
+                    *value = now->tm_year;
+                    break;
+                }
+                case 0x01: { // month
+                    *value = now->tm_mon;
+                    break;
+                }
+                case 0x02: { // day
+                    *value = now->tm_mday;
+                    break;
+                }
+                case 0x03: { // hour
+                    *value = now->tm_hour;
+                    break;
+                }
+                case 0x04: { // minute
+                    *value = now->tm_min;
+                    break;
+                }
+                case 0x05: { // second
+                    *value = now->tm_sec;
+                    break;
+                }
                 case 0x06: { // ms since startup
                     *value = rtc_uptime;
                     break;

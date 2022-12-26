@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+#include <time.h>
 
 #include "bus.h"
 #include "cpu.h"
@@ -32,7 +33,7 @@ uint32_t tick_end;
 int ticks = 0;
 bool done = false;
 
-struct timeval rtc_current_time;
+time_t rtc_time;
 uint32_t rtc_uptime;
 
 void main_loop(void);
@@ -124,7 +125,7 @@ void main_loop(void) {
 
     for (int i = 0; i < dt; i++) {
         rtc_uptime += 1;
-        gettimeofday(&rtc_current_time, 0);
+        rtc_time = time(NULL);
 
         int cycles_left = cycles_per_tick;
 
