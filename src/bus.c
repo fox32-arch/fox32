@@ -219,7 +219,7 @@ int bus_io_write(void *user, uint32_t value, uint32_t port) {
             uint8_t operation = (port & 0x0000F000) >> 8;
             switch (operation) {
                 case 0x10: {
-                    // TODO: ask the user to insert a disk
+                    // no-op
                     break;
                 };
                 case 0x20: {
