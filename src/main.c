@@ -88,7 +88,8 @@ int main(int argc, char *argv[]) {
         key_released,
         mouse_pressed,
         mouse_released,
-        mouse_moved
+        mouse_moved,
+        drop_file
     );
 
     ScreenInit();

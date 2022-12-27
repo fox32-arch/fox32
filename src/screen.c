@@ -115,7 +115,6 @@ int ScreenProcessEvents() {
                 break;
             }
 
-
             case SDL_MOUSEBUTTONUP: {
                 if (MainScreen.MouseReleased)
                     MainScreen.MouseReleased(event.button.button);
@@ -130,6 +129,14 @@ int ScreenProcessEvents() {
             case SDL_KEYUP:
                 if (MainScreen.KeyReleased)
                     MainScreen.KeyReleased(event.key.keysym.scancode);
+                break;
+
+            case SDL_DROPFILE:
+                if (MainScreen.DropFile) {
+                    char *file = event.drop.file;
+                    MainScreen.DropFile(file);
+                    SDL_free(file);
+                }
                 break;
         }
     }
@@ -160,7 +167,8 @@ void ScreenCreate(
     ScreenKeyReleasedF keyreleased,
     ScreenMousePressedF mousepressed,
     ScreenMouseReleasedF mousereleased,
-    ScreenMouseMovedF mousemoved
+    ScreenMouseMovedF mousemoved,
+    ScreenDropFileF dropfile
 ) {
 
     if (w > WindowWidth)
@@ -178,4 +186,5 @@ void ScreenCreate(
     MainScreen.MousePressed = mousepressed;
     MainScreen.MouseReleased = mousereleased;
     MainScreen.MouseMoved = mousemoved;
+    MainScreen.DropFile = dropfile;
 }

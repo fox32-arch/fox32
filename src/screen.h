@@ -10,6 +10,7 @@ typedef void (*ScreenKeyReleasedF)(int sdl_scancode);
 typedef void (*ScreenMousePressedF)(int button);
 typedef void (*ScreenMouseReleasedF)(int button);
 typedef void (*ScreenMouseMovedF)(int dx, int dy);
+typedef void (*ScreenDropFileF)(char *filename);
 
 struct Screen {
     int Width;
@@ -22,6 +23,7 @@ struct Screen {
     ScreenMousePressedF MousePressed;
     ScreenMouseReleasedF MouseReleased;
     ScreenMouseMovedF MouseMoved;
+    ScreenDropFileF DropFile;
 };
 
 void ScreenInit();
@@ -39,5 +41,6 @@ void ScreenCreate(
     ScreenKeyReleasedF keyreleased,
     ScreenMousePressedF mousepressed,
     ScreenMouseReleasedF mousereleased,
-    ScreenMouseMovedF mousemoved
+    ScreenMouseMovedF mousemoved,
+    ScreenDropFileF dropfile
 );

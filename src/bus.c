@@ -258,3 +258,13 @@ int bus_io_write(void *user, uint32_t value, uint32_t port) {
 
     return 0;
 }
+
+void drop_file(char *filename) {
+    int last_id = 0;
+    for (int i = 0; i < 4; i++) {
+        if (disk_controller.disks[i].size != 0) {
+            last_id++;
+        }
+    }
+    new_disk(filename, last_id);
+}
