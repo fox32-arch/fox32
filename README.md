@@ -1,6 +1,7 @@
 # fox32
 
-![fox32 logo](docs/logos/fox32.png)
+![fox32 logo](docs/logos/fox32-circle.png)  
+(logo by [ZenithNeko](https://zencorner.xyz/contacts.html))
 
 **fox32** (stylized in all lowercase) is a 32 bit fantasy computer architecture, with a custom operating system and user interface inspired by various classic computers.
 
