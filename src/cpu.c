@@ -246,7 +246,7 @@ static const asm_iinfo_t asm_iinfos[256] = {
     [OP_IREM ] = { "IREM ", 2 },
     [OP_RTA  ] = { "RTA  ", 2 },
     [OP_RETI ] = { "RETI ", 0 },
-    [OP_FLP  ] = { "FLP  ", 0 }
+    [OP_FLP  ] = { "FLP  ", 1 }
 };
 
 static const asm_iinfo_t *asm_iinfo_get(uint8_t opcode) {
