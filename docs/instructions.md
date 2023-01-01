@@ -1,7 +1,7 @@
 # Fox32 instructions
 
-This file describes every Fox32 instruction in detail. For a general
-description of the Fox32 CPU, see cpu.md.
+This file describes every fox32 instruction in detail. For a general
+description of the fox32 CPU, see cpu.md.
 
 ## NOP: no operation
 ## ADD: add

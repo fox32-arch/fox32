@@ -1,6 +1,6 @@
-# Fox32 CPU
+# fox32 CPU
 
-This document aims to describe the CPU in the the Fox32 architecture.
+This document aims to describe the CPU in the the fox32 architecture.
 Peripherals such as the disk controller are described elsewhere.
 
 
@@ -11,7 +11,7 @@ All 16-bit or 32-bit values are stored in memory in little-endian order.
 
 ## Registers
 
-The Fox32 CPU has the following registers:
+The fox32 CPU has the following registers:
 
 - **r0-r31**: 32-bit general-purpose registers
 - **rsp**: current stack pointer
@@ -31,7 +31,7 @@ The Fox32 CPU has the following registers:
 
 ## External buses
 
-There are two kinds of external bus that the Fox32 CPU can address:
+There are two kinds of external bus that the fox32 CPU can address:
 
 - **Memory**: Data is read from and written to memory with the `mov` instruction,
   instructions are fetch from memory.
