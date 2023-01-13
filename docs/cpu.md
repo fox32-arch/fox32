@@ -78,15 +78,15 @@ by a source operand, or by source and target operands, depending on the opcode.
 
 ### Condition codes
 
-| value | name   | description
-|-------|--------|-----------------------------------------------------
-|  0    | always | execute unconditionally
-|  1    | ifz    | execute if zero flag is set
-|  2    | ifnz   | execute if zero flag is not set
-|  3    | ifc    | execute if carry flag is set
-|  4    | ifnc   | execute if carry flag is not set
-|  5    | ifgt   | execute if neither zero flag nor carry flag is set
-|  6    | iflteq | execute if zero flag or carry flag is set
+| value | name        | description
+|-------|-------------|-----------------------------------------------------
+|  0    | always      | execute unconditionally
+|  1    | ifz         | execute if zero flag is set
+|  2    | ifnz        | execute if zero flag is not set
+|  3    | ifc/iflt    | execute if carry flag is set
+|  4    | ifnc/ifgteq | execute if carry flag is not set
+|  5    | ifgt        | execute if neither zero flag nor carry flag is set
+|  6    | iflteq      | execute if zero flag or carry flag is set
 
 
 ### Operation codes
