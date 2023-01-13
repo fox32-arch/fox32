@@ -34,7 +34,7 @@ The fox32 CPU has the following registers:
 There are two kinds of external bus that the fox32 CPU can address:
 
 - **Memory**: Data is read from and written to memory with the `mov` instruction,
-  instructions are fetch from memory.
+  instructions are fetched from memory.
 - **I/O bus**: Peripherals are connected to the I/O bus. Peripheral registers
   can be read using the `in` instruction and written using the `out` instruction.
 
