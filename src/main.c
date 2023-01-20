@@ -57,7 +57,17 @@ int main(int argc, char *argv[]) {
 
     size_t disk_id = 0;
     for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--disk") == 0) {
+        if (strcmp(argv[i], "--help") == 0) {
+            fprintf(stderr,
+                    "Usage: %s [OPTIONS]\n\n"
+                    "Options:\n"
+                    "  --help         Print this message\n"
+                    "  --disk DISK    Specify a disk image to use\n"
+                    "  --rom ROM      Specify a ROM image to use\n"
+                    "  --debug        Enable debug output\n"
+                   , argv[0]);
+            return 0;
+        } else if (strcmp(argv[i], "--disk") == 0) {
             if (i + 1 < argc) {
                 new_disk(argv[i + 1], disk_id++);
                 i++;
