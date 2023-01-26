@@ -40,13 +40,6 @@ void main_loop(void);
 void load_rom(const char *filename);
 
 int main(int argc, char *argv[]) {
-    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
-        fprintf(stderr, "unable to initialize SDL: %s", SDL_GetError());
-        return 1;
-    }
-
-    SDL_ShowCursor(SDL_DISABLE);
-
     fox32_init(&vm);
     vm.io_read = bus_io_read;
     vm.io_write = bus_io_write;
@@ -90,6 +83,12 @@ int main(int argc, char *argv[]) {
             return 1;
         }
     }
+    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+        fprintf(stderr, "unable to initialize SDL: %s", SDL_GetError());
+        return 1;
+    }
+
+    SDL_ShowCursor(SDL_DISABLE);
 
     ScreenCreate(
         FRAMEBUFFER_WIDTH, FRAMEBUFFER_HEIGHT,
