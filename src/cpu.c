@@ -861,6 +861,20 @@ static void vm_skipparam(vm_t *vm, uint32_t size, uint8_t prtype) {
     break;                                                                                        \
 }
 
+#define VM_IMPL_DIV(_size, _type, _type_target, _vm_source, _vm_source_stay, _vm_target, _oper) { \
+    VM_PRELUDE_2(_size);                                                                          \
+    _type a = (_type) _vm_source(vm, instr.source);                                               \
+    _type b = (_type) _vm_source_stay(vm, instr.target);                                          \
+    if (a == 0) {                                                                                 \
+        vm_panic(vm, FOX32_ERR_DIVZERO);                                                          \
+        break;                                                                                    \
+    }                                                                                             \
+    _type x = _oper(b, a);                                                                        \
+    vm->flag_zero = x == 0;                                                                       \
+    _vm_target(vm, instr.target, (_type_target) x);                                               \
+    break;                                                                                        \
+}
+
 #define VM_IMPL_CMP(_size, _type, _vm_source) { \
     VM_PRELUDE_0();                             \
     _type a = _vm_source(vm, instr.source);     \
@@ -1020,18 +1034,18 @@ static void vm_execute(vm_t *vm) {
         case OP(SZ_HALF, OP_IMUL): VM_IMPL_ADD(SIZE16, int16_t, uint16_t, vm_source16, vm_source16_stay, vm_target16, CHECKED_MUL);
         case OP(SZ_WORD, OP_IMUL): VM_IMPL_ADD(SIZE32, int32_t, uint32_t, vm_source32, vm_source32_stay, vm_target32, CHECKED_MUL);
 
-        case OP(SZ_BYTE, OP_DIV): VM_IMPL_AND(SIZE8, uint8_t, uint8_t, vm_source8, vm_source8_stay, vm_target8, OPER_DIV);
-        case OP(SZ_HALF, OP_DIV): VM_IMPL_AND(SIZE16, uint16_t, uint16_t, vm_source16, vm_source16_stay, vm_target16, OPER_DIV);
-        case OP(SZ_WORD, OP_DIV): VM_IMPL_AND(SIZE32, uint32_t, uint32_t, vm_source32, vm_source32_stay, vm_target32, OPER_DIV);
-        case OP(SZ_BYTE, OP_REM): VM_IMPL_AND(SIZE8, uint8_t, uint8_t, vm_source8, vm_source8_stay, vm_target8, OPER_REM);
-        case OP(SZ_HALF, OP_REM): VM_IMPL_AND(SIZE16, uint16_t, uint16_t, vm_source16, vm_source16_stay, vm_target16, OPER_REM);
-        case OP(SZ_WORD, OP_REM): VM_IMPL_AND(SIZE32, uint32_t, uint32_t, vm_source32, vm_source32_stay, vm_target32, OPER_REM);
-        case OP(SZ_BYTE, OP_IDIV): VM_IMPL_AND(SIZE8, int8_t, uint8_t, vm_source8, vm_source8_stay, vm_target8, OPER_DIV);
-        case OP(SZ_HALF, OP_IDIV): VM_IMPL_AND(SIZE16, int16_t, uint16_t, vm_source16, vm_source16_stay, vm_target16, OPER_DIV);
-        case OP(SZ_WORD, OP_IDIV): VM_IMPL_AND(SIZE32, int32_t, uint32_t, vm_source32, vm_source32_stay, vm_target32, OPER_DIV);
-        case OP(SZ_BYTE, OP_IREM): VM_IMPL_AND(SIZE8, int8_t, uint8_t, vm_source8, vm_source8_stay, vm_target8, OPER_REM);
-        case OP(SZ_HALF, OP_IREM): VM_IMPL_AND(SIZE16, int16_t, uint16_t, vm_source16, vm_source16_stay, vm_target16, OPER_REM);
-        case OP(SZ_WORD, OP_IREM): VM_IMPL_AND(SIZE32, int32_t, uint32_t, vm_source32, vm_source32_stay, vm_target32, OPER_REM);
+        case OP(SZ_BYTE, OP_DIV): VM_IMPL_DIV(SIZE8, uint8_t, uint8_t, vm_source8, vm_source8_stay, vm_target8, OPER_DIV);
+        case OP(SZ_HALF, OP_DIV): VM_IMPL_DIV(SIZE16, uint16_t, uint16_t, vm_source16, vm_source16_stay, vm_target16, OPER_DIV);
+        case OP(SZ_WORD, OP_DIV): VM_IMPL_DIV(SIZE32, uint32_t, uint32_t, vm_source32, vm_source32_stay, vm_target32, OPER_DIV);
+        case OP(SZ_BYTE, OP_REM): VM_IMPL_DIV(SIZE8, uint8_t, uint8_t, vm_source8, vm_source8_stay, vm_target8, OPER_REM);
+        case OP(SZ_HALF, OP_REM): VM_IMPL_DIV(SIZE16, uint16_t, uint16_t, vm_source16, vm_source16_stay, vm_target16, OPER_REM);
+        case OP(SZ_WORD, OP_REM): VM_IMPL_DIV(SIZE32, uint32_t, uint32_t, vm_source32, vm_source32_stay, vm_target32, OPER_REM);
+        case OP(SZ_BYTE, OP_IDIV): VM_IMPL_DIV(SIZE8, int8_t, uint8_t, vm_source8, vm_source8_stay, vm_target8, OPER_DIV);
+        case OP(SZ_HALF, OP_IDIV): VM_IMPL_DIV(SIZE16, int16_t, uint16_t, vm_source16, vm_source16_stay, vm_target16, OPER_DIV);
+        case OP(SZ_WORD, OP_IDIV): VM_IMPL_DIV(SIZE32, int32_t, uint32_t, vm_source32, vm_source32_stay, vm_target32, OPER_DIV);
+        case OP(SZ_BYTE, OP_IREM): VM_IMPL_DIV(SIZE8, int8_t, uint8_t, vm_source8, vm_source8_stay, vm_target8, OPER_REM);
+        case OP(SZ_HALF, OP_IREM): VM_IMPL_DIV(SIZE16, int16_t, uint16_t, vm_source16, vm_source16_stay, vm_target16, OPER_REM);
+        case OP(SZ_WORD, OP_IREM): VM_IMPL_DIV(SIZE32, int32_t, uint32_t, vm_source32, vm_source32_stay, vm_target32, OPER_REM);
 
         case OP(SZ_BYTE, OP_AND): VM_IMPL_AND(SIZE8, uint8_t, uint8_t, vm_source8, vm_source8_stay, vm_target8, OPER_AND);
         case OP(SZ_HALF, OP_AND): VM_IMPL_AND(SIZE16, uint16_t, uint16_t, vm_source16, vm_source16_stay, vm_target16, OPER_AND);
