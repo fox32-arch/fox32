@@ -880,19 +880,19 @@ static void vm_skipparam(vm_t *vm, uint32_t size, uint8_t prtype) {
     break;                                      \
 }
 
-static void vm_debug(vm_t *vm, asm_instr_t instr, uint32_t address) {
+static void vm_debug(vm_t *vm, asm_instr_t instr, uint32_t ip, uint32_t sp) {
     const asm_iinfo_t *iinfo = asm_iinfo_get(instr.opcode);
 
     uint32_t params_size = asm_disas_paramssize(instr, iinfo);
     uint8_t *params_data = NULL;
     if (params_size > 0) {
-        params_data = vm_findmemory(vm, address + SIZE16, params_size, false);
+        params_data = vm_findmemory(vm, ip + SIZE16, params_size, false);
     }
 
     char buffer[128] = {};
     asm_disas_print(instr, iinfo, params_data, buffer);
 
-    printf("%08X %s\n", address, buffer);
+    printf("SP=%08X IP=%08X %s\n", sp, ip, buffer);
 }
 
 static void vm_execute(vm_t *vm) {
@@ -903,7 +903,7 @@ static void vm_execute(vm_t *vm) {
 
     vm->pointer_instr_mut = instr_base + SIZE16;
 
-    if (vm->debug) vm_debug(vm, instr, instr_base);
+    if (vm->debug) vm_debug(vm, instr, instr_base, vm->pointer_stack);
 
     switch (instr.opcode) {
         case OP(SZ_BYTE, OP_NOP):
