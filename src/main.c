@@ -40,13 +40,6 @@ void main_loop(void);
 void load_rom(const char *filename);
 
 int main(int argc, char *argv[]) {
-    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
-        fprintf(stderr, "unable to initialize SDL: %s", SDL_GetError());
-        return 1;
-    }
-
-    SDL_ShowCursor(SDL_DISABLE);
-
     fox32_init(&vm);
     vm.io_read = bus_io_read;
     vm.io_write = bus_io_write;
@@ -65,6 +58,7 @@ int main(int argc, char *argv[]) {
                     "  --disk DISK    Specify a disk image to use\n"
                     "  --rom ROM      Specify a ROM image to use\n"
                     "  --debug        Enable debug output\n"
+                    "  --headless     Headless mode: don't open a window\n"
                    , argv[0]);
             return 0;
         } else if (strcmp(argv[i], "--disk") == 0) {
@@ -85,25 +79,36 @@ int main(int argc, char *argv[]) {
             }
         } else if (strcmp(argv[i], "--debug") == 0) {
             vm.debug = true;
+        } else if (strcmp(argv[i], "--headless") == 0) {
+            vm.headless = true;
         } else {
             fprintf(stderr, "unrecognized option %s\n", argv[i]);
             return 1;
         }
     }
 
-    ScreenCreate(
-        FRAMEBUFFER_WIDTH, FRAMEBUFFER_HEIGHT,
-        draw_framebuffer,
-        key_pressed,
-        key_released,
-        mouse_pressed,
-        mouse_released,
-        mouse_moved,
-        drop_file
-    );
+    if (!vm.headless) {
+        if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+            fprintf(stderr, "unable to initialize SDL: %s", SDL_GetError());
+            return 1;
+        }
 
-    ScreenInit();
-    ScreenDraw();
+        SDL_ShowCursor(SDL_DISABLE);
+
+        ScreenCreate(
+            FRAMEBUFFER_WIDTH, FRAMEBUFFER_HEIGHT,
+            draw_framebuffer,
+            key_pressed,
+            key_released,
+            mouse_pressed,
+            mouse_released,
+            mouse_moved,
+            drop_file
+        );
+
+        ScreenInit();
+        ScreenDraw();
+    }
 
     tick_start = SDL_GetTicks();
     tick_end = SDL_GetTicks();
@@ -159,7 +164,8 @@ void main_loop(void) {
     }
 
     if ((ticks % TPF) == 0) {
-        ScreenDraw();
+        if (!vm.headless)
+            ScreenDraw();
         fox32_raise(&vm, VSYNC_INTERRUPT_VECTOR);
         vm.halted = false;
     }

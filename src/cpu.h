@@ -58,6 +58,7 @@ typedef struct {
     bool halted;
 
     bool debug;
+    bool headless;
 
     bool mmu_enabled;
 
