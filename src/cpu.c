@@ -876,7 +876,7 @@ static void vm_skipparam(vm_t *vm, uint32_t size, uint8_t prtype) {
 }
 
 #define VM_IMPL_CMP(_size, _type, _vm_source) { \
-    VM_PRELUDE_0();                             \
+    VM_PRELUDE_2(_size);                        \
     _type a = _vm_source(vm, instr.source);     \
     _type b = _vm_source(vm, instr.target);     \
     _type x;                                    \
