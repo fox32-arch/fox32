@@ -19,6 +19,10 @@ void new_disk(const char *filename, size_t id) {
     if (id > 3) { puts("attempting to access disk with ID > 3\n"); return; }
     printf("mounting %s as disk ID %d\n", filename, (int) id);
     disk_controller.disks[id].file = fopen(filename, "r+b");
+    if (!disk_controller.disks[id].file) {
+        fprintf(stderr, "couldn't open disk file\n");
+        exit(1);
+    }
     fseek(disk_controller.disks[id].file, 0, SEEK_END);
     disk_controller.disks[id].size = ftell(disk_controller.disks[id].file);
     rewind(disk_controller.disks[id].file);
