@@ -28,6 +28,9 @@ Writing to this register outputs the lowest 8 bits as a byte on the debug
 serial port (stdout in case of the fox32 emulator). If necessary, the CPU is
 stalled long enough to ensure that the byte is output rather than discarded.
 
+Reading from this register gets a byte of input from the serial port, if
+available, or zero otherwise.
+
 
 ## 0x80000000: Display
 

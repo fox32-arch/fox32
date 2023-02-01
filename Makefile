@@ -13,7 +13,8 @@ CFILES = src/main.c \
 		src/keyboard.c \
 		src/mmu.c \
 		src/mouse.c \
-		src/screen.c
+		src/screen.c \
+		src/serial.c
 
 FOX32ROM_IN = fox32.rom
 FOX32ROM_OUT = fox32rom.h
