@@ -420,28 +420,33 @@ static uint32_t *vm_findlocal(vm_t *vm, uint8_t local) {
     vm_panic(vm, FOX32_ERR_BADREGISTER);
 }
 
-static uint8_t *vm_findmemory(vm_t *vm, uint32_t address, uint32_t size, bool write) {
+static uint8_t *vm_findmemory_phys(vm_t *vm, uint32_t address, uint32_t size, bool write) {
     uint32_t address_end = address + size;
+
+    if (address_end > address) {
+        if (address_end <= FOX32_MEMORY_RAM) {
+            return &vm->memory_ram[address];
+        }
+        if (
+            !write &&
+            (address >= FOX32_MEMORY_ROM_START) &&
+            (address -= FOX32_MEMORY_ROM_START) + size <= FOX32_MEMORY_ROM
+        ) {
+            return &vm->memory_rom[address];
+        }
+    }
+    if (!write) {
+        vm->exception_operand = address;
+        vm_panic(vm, FOX32_ERR_FAULT_RD);
+    } else {
+        vm->exception_operand = address;
+        vm_panic(vm, FOX32_ERR_FAULT_WR);
+    }
+}
+
+static uint8_t *vm_findmemory(vm_t *vm, uint32_t address, uint32_t size, bool write) {
     if (!vm->mmu_enabled) {
-        if (address_end > address) {
-            if (address_end <= FOX32_MEMORY_RAM) {
-                return &vm->memory_ram[address];
-            }
-            if (
-                !write &&
-                (address >= FOX32_MEMORY_ROM_START) &&
-                (address -= FOX32_MEMORY_ROM_START) + size <= FOX32_MEMORY_ROM
-            ) {
-                return &vm->memory_rom[address];
-            }
-        }
-        if (!write) {
-            vm->exception_operand = address;
-            vm_panic(vm, FOX32_ERR_FAULT_RD);
-        } else {
-            vm->exception_operand = address;
-            vm_panic(vm, FOX32_ERR_FAULT_WR);
-        }
+        return vm_findmemory_phys(vm, address, size, write);
     } else {
         mmu_page_t *virtual_page = get_present_page(address);
         if (virtual_page == NULL) {
@@ -459,26 +464,8 @@ static uint8_t *vm_findmemory(vm_t *vm, uint32_t address, uint32_t size, bool wr
         }
         uint32_t offset = address & 0x00000FFF;
         uint32_t physical_address = virtual_page->physical_address | offset;
-        address_end = physical_address + size;
-        if (address_end > physical_address) {
-            if (address_end <= FOX32_MEMORY_RAM) {
-                return &vm->memory_ram[physical_address];
-            }
-            if (
-                !write &&
-                (physical_address >= FOX32_MEMORY_ROM_START) &&
-                (physical_address -= FOX32_MEMORY_ROM_START) + size <= FOX32_MEMORY_ROM
-            ) {
-                return &vm->memory_rom[physical_address];
-            }
-        }
-        if (!write) {
-            vm->exception_operand = address;
-            vm_panic(vm, FOX32_ERR_FAULT_RD);
-        } else {
-            vm->exception_operand = address;
-            vm_panic(vm, FOX32_ERR_FAULT_WR);
-        }
+
+        return vm_findmemory_phys(vm, physical_address, size, write);
     }
 }
 
