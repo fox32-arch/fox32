@@ -1,7 +1,7 @@
 # fox32 CPU
 
 This document aims to describe the CPU in the the fox32 architecture.
-Peripherals such as the disk controller are described elsewhere.
+Peripherals such as the disk controller are described in [io_bus.md](./io_bus.md).
 
 
 ## Endianness
