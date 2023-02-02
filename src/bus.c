@@ -16,6 +16,7 @@
 #include "framebuffer.h"
 #include "keyboard.h"
 #include "mouse.h"
+#include "serial.h"
 
 bool bus_requests_exit = false;
 
@@ -29,6 +30,11 @@ extern mouse_t mouse;
 int bus_io_read(void *user, uint32_t *value, uint32_t port) {
     (void) user;
     switch (port) {
+        case 0x00000000: { // serial port
+            *value = serial_get();
+            break;
+        };
+
         case 0x80000000 ... 0x8000031F: { // overlay port
             uint8_t overlay_number = port & 0x000000FF;
             uint8_t setting = (port & 0x0000FF00) >> 8;
@@ -152,9 +158,8 @@ int bus_io_read(void *user, uint32_t *value, uint32_t port) {
 int bus_io_write(void *user, uint32_t value, uint32_t port) {
     (void) user;
     switch (port) {
-        case 0x00000000: { // terminal output port
-            putchar((int) value);
-            fflush(stdout);
+        case 0x00000000: { // serial port
+            serial_put(value);
             break;
         };
 

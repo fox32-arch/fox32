@@ -16,6 +16,7 @@
 #include "keyboard.h"
 #include "mouse.h"
 #include "screen.h"
+#include "serial.h"
 
 #include "../fox32rom.h"
 
@@ -109,6 +110,8 @@ int main(int argc, char *argv[]) {
         ScreenInit();
         ScreenDraw();
     }
+
+    serial_init();
 
     tick_start = SDL_GetTicks();
     tick_end = SDL_GetTicks();
