@@ -55,6 +55,16 @@ by a source operand, or by source and target operands, depending on the opcode.
 | 15:14  | size   | operation size, e.g. 32 bits
 
 
+NOTE: Although in the instruction encoding the source operand comes first,
+followed by the target operand, the order is reversed in the fox32 assembly
+language. The following lines are equivalent:
+
+```
+cmp r1, r20
+data.16 0x8700 data.8 20 data.8 1
+```
+
+
 ### Operand types
 
 | value | description           | size of operand  | what's actually stored?
