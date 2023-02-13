@@ -7,3 +7,8 @@ fox32
 
 fox32.exe
 SDL2.dll
+
+fox32.html
+fox32.wasm
+fox32.js
+fox32.data

@@ -8,6 +8,10 @@
 #include <string.h>
 #include <sys/time.h>
 #include <time.h>
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#include <emscripten/html5.h>
+#endif
 
 #include "bus.h"
 #include "cpu.h"
@@ -50,6 +54,7 @@ int main(int argc, char *argv[]) {
     memcpy(vm.memory_rom, fox32rom, sizeof(fox32rom));
 
     size_t disk_id = 0;
+#ifndef __EMSCRIPTEN__
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0) {
             fprintf(stderr,
@@ -87,6 +92,9 @@ int main(int argc, char *argv[]) {
             return 1;
         }
     }
+#else
+    new_disk("fox32os.img", disk_id++);
+#endif
 
     if (!vm.headless) {
         if (SDL_Init(SDL_INIT_VIDEO) != 0) {
@@ -116,6 +124,10 @@ int main(int argc, char *argv[]) {
     tick_start = SDL_GetTicks();
     tick_end = SDL_GetTicks();
 
+#ifdef __EMSCRIPTEN__
+    emscripten_set_main_loop(main_loop, FPS, 1);
+#endif
+
     while (!done && !bus_requests_exit) {
         main_loop();
 
@@ -132,6 +144,11 @@ int main(int argc, char *argv[]) {
 }
 
 void main_loop(void) {
+#ifdef __EMSCRIPTEN__
+    if (done || bus_requests_exit) {
+        emscripten_cancel_main_loop();
+    }
+#endif
     int dt = SDL_GetTicks() - tick_start;
     tick_start = SDL_GetTicks();
     if (!dt)
