@@ -1,5 +1,7 @@
 **/.vscode/
 
+*.o
+
 fox32.rom
 fox32rom.h
 
