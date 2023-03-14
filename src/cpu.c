@@ -506,32 +506,36 @@ static uint32_t vm_read_across(vm_t *vm, uint32_t address, int size) {
 }
 
 void vm_write_across(vm_t *vm, uint32_t address, int size, uint32_t value) {
+    // calculate number of bytes for each page
+
+    int bytes_first = 0x1000 - (address & 0x00000FFF);
+
+    int address_second = (address + size) & 0xFFFFF000;
+    int bytes_second = (address + size) & 0x00000FFF;
+
+    // make sure both pages are resident before doing any writing
+
+    uint8_t *ptr_first = vm_findmemory(vm, address, bytes_first, true);
+    uint8_t *ptr_second = vm_findmemory(vm, address_second, bytes_second, true);
+
     // write the first page
 
-    int bytes = 0x1000 - (address & 0x00000FFF);
-    uint8_t *ptr = vm_findmemory(vm, address, bytes, true);
-
-    while (bytes) {
-        *ptr = value & 0xFF;
+    while (bytes_first) {
+        *ptr_first = value & 0xFF;
         value >>= 8;
 
-        ptr++;
-        bytes--;
+        ptr_first++;
+        bytes_first--;
     }
 
     // write the second page
 
-    bytes = (address + size) & 0x00000FFF;
-    address = (address + size) & 0xFFFFF000;
-
-    ptr = vm_findmemory(vm, address, bytes, true);
-
-    while (bytes) {
-        *ptr = value & 0xFF;
+    while (bytes_second) {
+        *ptr_second = value & 0xFF;
         value >>= 8;
 
-        ptr++;
-        bytes--;
+        ptr_second++;
+        bytes_second--;
     }
 }
 
@@ -790,9 +794,18 @@ static void vm_skipparam(vm_t *vm, uint32_t size, uint8_t prtype) {
     break;                                                 \
 }
 
+// make sure NOT to update the stack pointer until the full instruction has
+// been read, and the target has been written. otherwise a pagefault halfway
+// through could wreak havoc.
+
 #define VM_IMPL_POP(_size, _vm_target, _vm_pop) { \
     VM_PRELUDE_1(_size);                          \
-    _vm_target(vm, instr.source, _vm_pop(vm));    \
+    uint32_t oldsp = vm->pointer_stack;           \
+    uint32_t val = _vm_pop(vm);                   \
+    uint32_t newsp = vm->pointer_stack;           \
+    vm->pointer_stack = oldsp;                    \
+    _vm_target(vm, instr.source, val);            \
+    vm->pointer_stack = newsp;                    \
     break;                                        \
 }
 
@@ -812,8 +825,8 @@ static void vm_skipparam(vm_t *vm, uint32_t size, uint8_t prtype) {
     VM_PRELUDE_1(_size);                                         \
     _type v = _vm_source_stay(vm, instr.source);                 \
     _type x = ~v;                                                \
-    vm->flag_zero = x == 0;                                      \
     _vm_target(vm, instr.source, x);                             \
+    vm->flag_zero = x == 0;                                      \
     break;                                                       \
 }
 
@@ -821,9 +834,10 @@ static void vm_skipparam(vm_t *vm, uint32_t size, uint8_t prtype) {
     VM_PRELUDE_1(_size);                                                \
     _type v = _vm_source_stay(vm, instr.source);                        \
     _type x;                                                            \
-    vm->flag_carry = _oper(v, 1, &x);                                   \
-    vm->flag_zero = x == 0;                                             \
+    bool carry = _oper(v, 1, &x);                                       \
     _vm_target(vm, instr.source, x);                                    \
+    vm->flag_carry = carry;                                             \
+    vm->flag_zero = x == 0;                                             \
     break;                                                              \
 }
 
@@ -832,9 +846,10 @@ static void vm_skipparam(vm_t *vm, uint32_t size, uint8_t prtype) {
     _type a = (_type) _vm_source(vm, instr.source);                                               \
     _type b = (_type) _vm_source_stay(vm, instr.target);                                          \
     _type x;                                                                                      \
-    vm->flag_carry = _oper(b, a, &x);                                                             \
-    vm->flag_zero = x == 0;                                                                       \
+    bool carry = _oper(b, a, &x);                                                                 \
     _vm_target(vm, instr.target, (_type_target) x);                                               \
+    vm->flag_carry = carry;                                                                       \
+    vm->flag_zero = x == 0;                                                                       \
     break;                                                                                        \
 }
 
@@ -843,8 +858,8 @@ static void vm_skipparam(vm_t *vm, uint32_t size, uint8_t prtype) {
     _type a = (_type) _vm_source(vm, instr.source);                                               \
     _type b = (_type) _vm_source_stay(vm, instr.target);                                          \
     _type x = _oper(b, a);                                                                        \
-    vm->flag_zero = x == 0;                                                                       \
     _vm_target(vm, instr.target, (_type_target) x);                                               \
+    vm->flag_zero = x == 0;                                                                       \
     break;                                                                                        \
 }
 
@@ -857,8 +872,8 @@ static void vm_skipparam(vm_t *vm, uint32_t size, uint8_t prtype) {
         break;                                                                                    \
     }                                                                                             \
     _type x = _oper(b, a);                                                                        \
-    vm->flag_zero = x == 0;                                                                       \
     _vm_target(vm, instr.target, (_type_target) x);                                               \
+    vm->flag_zero = x == 0;                                                                       \
     break;                                                                                        \
 }
 
