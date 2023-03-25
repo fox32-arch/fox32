@@ -94,7 +94,7 @@ int bus_io_read(void *user, uint32_t *value, uint32_t port) {
             break;
         }
 
-        case 0x80000700 ... 0x80000706: { // RTC port
+        case 0x80000700 ... 0x80000707: { // RTC port
             uint8_t setting = port & 0x000000FF;
             struct tm *now = localtime(&rtc_time);
             switch (setting) {
@@ -124,6 +124,10 @@ int bus_io_read(void *user, uint32_t *value, uint32_t port) {
                 }
                 case 0x06: { // ms since startup
                     *value = rtc_uptime;
+                    break;
+                }
+                case 0x07: { // daylight savings time active
+                    *value = now->tm_isdst;
                     break;
                 }
             }
