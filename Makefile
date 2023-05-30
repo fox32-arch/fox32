@@ -7,7 +7,7 @@ LDFLAGS += `$(SDL2_CONFIG) --libs`
 else
 ifeq ($(TARGET),mingw)
 CC = x86_64-w64-mingw32-gcc
-CFLAGS += -g -Ofast -std=c99 -Wall -Wextra
+CFLAGS += -g -Ofast -std=c99 -Wall -Wextra -DWINDOWS
 LDFLAGS += -lmingw32 -lSDL2main -lSDL2
 TARGET_FILE_EXTENSION = .exe
 else

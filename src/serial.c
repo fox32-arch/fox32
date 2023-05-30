@@ -1,6 +1,7 @@
+#include <stdio.h>
+#ifndef WINDOWS
 #include <sys/select.h>
 #include <unistd.h>
-#include <stdio.h>
 #include <termios.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -49,6 +50,8 @@ int serial_get(void) {
 
     return 0;
 }
+
+#endif
 
 void serial_put(int value) {
     putchar((int) value);

@@ -30,10 +30,12 @@ extern mouse_t mouse;
 int bus_io_read(void *user, uint32_t *value, uint32_t port) {
     (void) user;
     switch (port) {
+#ifndef WINDOWS
         case 0x00000000: { // serial port
             *value = serial_get();
             break;
         };
+#endif
 
         case 0x80000000 ... 0x8000031F: { // overlay port
             uint8_t overlay_number = port & 0x000000FF;

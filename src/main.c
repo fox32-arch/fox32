@@ -119,7 +119,9 @@ int main(int argc, char *argv[]) {
         ScreenDraw();
     }
 
+#ifndef WINDOWS
     serial_init();
+#endif
 
     tick_start = SDL_GetTicks();
     tick_end = SDL_GetTicks();
