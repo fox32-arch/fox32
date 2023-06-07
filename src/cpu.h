@@ -56,6 +56,7 @@ typedef struct {
     bool flag_swap_sp;
 
     bool halted;
+    bool soft_halted;
 
     bool debug;
     bool headless;

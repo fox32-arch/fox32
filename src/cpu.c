@@ -363,6 +363,7 @@ static void vm_init(vm_t *vm) {
     vm->pointer_instr = FOX32_POINTER_DEFAULT_INSTR;
     vm->pointer_stack = FOX32_POINTER_DEFAULT_STACK;
     vm->halted = true;
+    vm->soft_halted = false;
     vm->mmu_enabled = false;
     vm->io_user = NULL;
     vm->io_read = io_read_default;
@@ -932,7 +933,7 @@ static void vm_execute(vm_t *vm) {
         case OP(SZ_HALF, OP_HALT):
         case OP(SZ_WORD, OP_HALT): {
             VM_PRELUDE_0();
-            vm->halted = true;
+            vm->soft_halted = true;
             break;
         };
 
@@ -1142,11 +1143,16 @@ static err_t vm_resume(vm_t *vm, uint32_t count, uint32_t *executed) {
     vm->halted = false;
 
     uint32_t remaining = count;
-    while (!vm->halted && remaining > 0) {
+    while (!vm->halted && !vm->soft_halted && remaining > 0) {
         vm_execute(vm);
         remaining -= 1;
         *executed += 1;
     }
+
+    if (vm->soft_halted) {
+        *executed = count;
+    }
+
     return FOX32_ERR_OK;
 }
 
@@ -1187,6 +1193,7 @@ static fox32_err_t vm_raise(vm_t *vm, uint16_t vector) {
 
     vm->pointer_instr = pointer_handler;
     vm->halted = true;
+    vm->soft_halted = false;
     vm->flag_interrupt = false;
 
     return FOX32_ERR_OK;
