@@ -8,7 +8,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "cpu.h"
 #include "keyboard.h"
+
+extern fox32_vm_t vm;
 
 typedef struct node_s {
     struct node_s *prev;
@@ -150,6 +153,7 @@ keycode_t key_convert(int sdlcode) {
 }
 
 void key_pressed(int sdlcode) {
+    if (sdlcode == SDL_SCANCODE_F11) vm.debug = !vm.debug;
     keycode_t code = key_convert(sdlcode);
     if (code) key_put(code);
 }
