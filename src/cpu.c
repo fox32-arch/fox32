@@ -835,7 +835,7 @@ static void vm_skipparam(vm_t *vm, uint32_t size, uint8_t prtype) {
     VM_PRELUDE_1(_size);                                                \
     _type v = _vm_source_stay(vm, instr.source);                        \
     _type x;                                                            \
-    bool carry = _oper(v, 1, &x);                                       \
+    bool carry = _oper(v, 1 << instr.target, &x);                       \
     _vm_target(vm, instr.source, x);                                    \
     vm->flag_carry = carry;                                             \
     vm->flag_zero = x == 0;                                             \
