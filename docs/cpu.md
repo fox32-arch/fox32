@@ -118,7 +118,7 @@ data.16 0x8700 data.8 20 data.8 1
 | 0x0C  | ISE    | none     |      32 | set interrupt enable flag
 | 0x0D  | MSE    | none     |      32 | set MMU enable flag
 | 0x10  | HALT   | none     | 8/16/32 | halt CPU
-| 0x11  | INC    | src      | 8/16/32 | increment (add 1)
+| 0x11  | INC    | src      | 8/16/32 | increment (add 1 << tgt in opcode encoding)
 | 0x13  | OR     | src+tgt  | 8/16/32 | bitwise OR
 | 0x14  | IMUL   | src+tgt  | 8/16/32 | multiply (signed)
 | 0x15  | SRL    | src+tgt  | 8/16/32 | shift right logical (with zero extension)
@@ -143,7 +143,7 @@ data.16 0x8700 data.8 20 data.8 1
 | 0x2A  | RET    | none     |      32 | return from function
 | 0x2C  | INT    | src      |      32 | raise interrupt
 | 0x2D  | TLB    | src      |      32 | flush TLB and set page directory pointer
-| 0x31  | DEC    | src      | 8/16/32 | decrement (subtract 1)
+| 0x31  | DEC    | src      | 8/16/32 | decrement (subtract 1 << tgt in opcode encoding)
 | 0x32  | REM    | src+tgt  | 8/16/32 | calculate remainder of division (unsigned)
 | 0x33  | NOT    | src      | 8/16/32 | bitwise NOT
 | 0x34  | IDIV   | src+tgt  | 8/16/32 | divide (signed)
