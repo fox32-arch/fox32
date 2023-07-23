@@ -162,6 +162,7 @@ data.16 0x8700 data.8 20 data.8 1
 |  2    | word (32 bits)
 |  3    | reserved
 
+For SLA, SRA, SRL, ROR, ROL, BCL, BSE, BTS, src immediates are fixed to 8 bits
 
 ## Interrupts and Exceptions
 

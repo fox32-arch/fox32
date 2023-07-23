@@ -176,6 +176,7 @@ static void ptr_set32(void *ptr, uint32_t value) {
 typedef struct {
     uint8_t opcode;
     uint8_t condition;
+    uint8_t offset;
     uint8_t target;
     uint8_t source;
     uint8_t size;
@@ -185,6 +186,7 @@ static asm_instr_t asm_instr_from(uint16_t half) {
     asm_instr_t instr = {
         (half >>  8),
         (half >>  4) & 7,
+        (half >>  7) & 1,
         (half >>  2) & 3,
         (half      ) & 3,
         (half >> 14)
@@ -604,7 +606,7 @@ static uint32_t vm_pop32(vm_t *vm) {
     VM_POP_BODY(vm_read32, SIZE32)
 }
 
-#define VM_SOURCE_BODY(_vm_read, _size, _type, _move)                           \
+#define VM_SOURCE_BODY(_vm_read, _size, _type, _move, _offset)                  \
     uint32_t pointer_base = vm->pointer_instr_mut;                              \
     switch (prtype) {                                                           \
         case TY_REG: {                                                          \
@@ -612,8 +614,9 @@ static uint32_t vm_pop32(vm_t *vm) {
             return (_type) *vm_findlocal(vm, vm_read8(vm, pointer_base));       \
         };                                                                      \
         case TY_REGPTR: {                                                       \
-            if (_move) vm->pointer_instr_mut += SIZE8;                          \
-            return _vm_read(vm, *vm_findlocal(vm, vm_read8(vm, pointer_base))); \
+            if (_move) vm->pointer_instr_mut += SIZE8+_offset;                  \
+            return _vm_read(vm, *vm_findlocal(vm, vm_read8(vm, pointer_base))   \
+                            +(_offset ? vm_read8(vm, pointer_base + 1) : 0));   \
         };                                                                      \
         case TY_IMM: {                                                          \
             if (_move) vm->pointer_instr_mut += _size;                          \
@@ -626,26 +629,26 @@ static uint32_t vm_pop32(vm_t *vm) {
     }                                                                           \
     vm_unreachable(vm);
 
-static uint8_t vm_source8(vm_t *vm, uint8_t prtype) {
-    VM_SOURCE_BODY(vm_read8, SIZE8, uint8_t, true)
+static uint8_t vm_source8(vm_t *vm, uint8_t prtype, uint8_t offset) {
+    VM_SOURCE_BODY(vm_read8, SIZE8, uint8_t, true, offset)
 }
-static uint8_t vm_source8_stay(vm_t *vm, uint8_t prtype) {
-    VM_SOURCE_BODY(vm_read8, SIZE8, uint8_t, false)
+static uint8_t vm_source8_stay(vm_t *vm, uint8_t prtype, uint8_t offset) {
+    VM_SOURCE_BODY(vm_read8, SIZE8, uint8_t, false, offset)
 }
-static uint16_t vm_source16(vm_t *vm, uint8_t prtype) {
-    VM_SOURCE_BODY(vm_read16, SIZE16, uint16_t, true)
+static uint16_t vm_source16(vm_t *vm, uint8_t prtype, uint8_t offset) {
+    VM_SOURCE_BODY(vm_read16, SIZE16, uint16_t, true, offset)
 }
-static uint16_t vm_source16_stay(vm_t *vm, uint8_t prtype) {
-    VM_SOURCE_BODY(vm_read16, SIZE16, uint16_t, false)
+static uint16_t vm_source16_stay(vm_t *vm, uint8_t prtype, uint8_t offset) {
+    VM_SOURCE_BODY(vm_read16, SIZE16, uint16_t, false, offset)
 }
-static uint32_t vm_source32(vm_t *vm, uint8_t prtype) {
-    VM_SOURCE_BODY(vm_read32, SIZE32, uint32_t, true)
+static uint32_t vm_source32(vm_t *vm, uint8_t prtype, uint8_t offset) {
+    VM_SOURCE_BODY(vm_read32, SIZE32, uint32_t, true, offset)
 }
-static uint32_t vm_source32_stay(vm_t *vm, uint8_t prtype) {
-    VM_SOURCE_BODY(vm_read32, SIZE32, uint32_t, false)
+static uint32_t vm_source32_stay(vm_t *vm, uint8_t prtype, uint8_t offset) {
+    VM_SOURCE_BODY(vm_read32, SIZE32, uint32_t, false, offset)
 }
 
-#define VM_TARGET_BODY(_vm_write, _localvalue)                                   \
+#define VM_TARGET_BODY(_vm_write, _localvalue, _offset)                          \
     uint32_t pointer_base = vm->pointer_instr_mut;                               \
     switch (prtype) {                                                            \
         case TY_REG: {                                                           \
@@ -655,8 +658,9 @@ static uint32_t vm_source32_stay(vm_t *vm, uint8_t prtype) {
             return;                                                              \
         };                                                                       \
         case TY_REGPTR: {                                                        \
-            vm->pointer_instr_mut += SIZE8;                                      \
-            _vm_write(vm, *vm_findlocal(vm, vm_read8(vm, pointer_base)), value); \
+            vm->pointer_instr_mut += SIZE8+_offset;                              \
+            _vm_write(vm, ( _offset ? vm_read8(vm, pointer_base + 1) : 0) +      \
+                          *vm_findlocal(vm, vm_read8(vm, pointer_base)), value); \
             return;                                                              \
         };                                                                       \
         case TY_IMM: {                                                           \
@@ -671,20 +675,20 @@ static uint32_t vm_source32_stay(vm_t *vm, uint8_t prtype) {
     };                                                                           \
     vm_unreachable(vm);
 
-static void vm_target8(vm_t *vm, uint8_t prtype, uint8_t value) {
-    VM_TARGET_BODY(vm_write8, (*vm_findlocal(vm, local) & 0xFFFFFF00) | (uint32_t) value)
+static void vm_target8(vm_t *vm, uint8_t prtype, uint8_t value, uint8_t offset) {
+    VM_TARGET_BODY(vm_write8, (*vm_findlocal(vm, local) & 0xFFFFFF00) | (uint32_t) value, offset)
 }
-static void vm_target8_zero(vm_t *vm, uint8_t prtype, uint8_t value) {
-    VM_TARGET_BODY(vm_write8, (uint32_t) value)
+static void vm_target8_zero(vm_t *vm, uint8_t prtype, uint8_t value, uint8_t offset) {
+    VM_TARGET_BODY(vm_write8, (uint32_t) value, offset)
 }
-static void vm_target16(vm_t *vm, uint8_t prtype, uint16_t value) {
-    VM_TARGET_BODY(vm_write16, (*vm_findlocal(vm, local) & 0xFFFF0000) | (uint32_t) value)
+static void vm_target16(vm_t *vm, uint8_t prtype, uint16_t value, uint8_t offset) {
+    VM_TARGET_BODY(vm_write16, (*vm_findlocal(vm, local) & 0xFFFF0000) | (uint32_t) value, offset)
 }
-static void vm_target16_zero(vm_t *vm, uint8_t prtype, uint16_t value) {
-    VM_TARGET_BODY(vm_write16, (uint32_t) value)
+static void vm_target16_zero(vm_t *vm, uint8_t prtype, uint16_t value, uint8_t offset) {
+    VM_TARGET_BODY(vm_write16, (uint32_t) value, offset)
 }
-static void vm_target32(vm_t *vm, uint8_t prtype, uint32_t value) {
-    VM_TARGET_BODY(vm_write32, value)
+static void vm_target32(vm_t *vm, uint8_t prtype, uint32_t value, uint8_t offset) {
+    VM_TARGET_BODY(vm_write32, value, offset)
 }
 
 static bool vm_shouldskip(vm_t *vm, uint8_t condition) {
@@ -714,9 +718,11 @@ static bool vm_shouldskip(vm_t *vm, uint8_t condition) {
     vm_panic(vm, FOX32_ERR_BADCONDITION);
 }
 
-static void vm_skipparam(vm_t *vm, uint32_t size, uint8_t prtype) {
+static void vm_skipparam(vm_t *vm, uint32_t size, uint8_t prtype, uint8_t offset) {
     if (prtype < TY_IMM) {
         vm->pointer_instr_mut += SIZE8;
+        if (offset && prtype==TY_REGPTR) 
+            vm->pointer_instr_mut += SIZE8;
     } else if (prtype == TY_IMMPTR) {
         vm->pointer_instr_mut += SIZE32;
     } else {
@@ -755,88 +761,95 @@ static void vm_skipparam(vm_t *vm, uint32_t size, uint8_t prtype) {
         break;                                \
     }                                         \
 }
-#define VM_PRELUDE_1(_size) {                  \
-    if (vm_shouldskip(vm, instr.condition)) {  \
-        vm_skipparam(vm, _size, instr.source); \
-        break;                                 \
-    }                                          \
+#define VM_PRELUDE_1(_size) {                                \
+    if (vm_shouldskip(vm, instr.condition)) {                \
+        vm_skipparam(vm, _size, instr.source, instr.offset); \
+        break;                                               \
+    }                                                        \
 }
-#define VM_PRELUDE_2(_size) {                  \
-    if (vm_shouldskip(vm, instr.condition)) {  \
-        vm_skipparam(vm, _size, instr.target); \
-        vm_skipparam(vm, _size, instr.source); \
-        break;                                 \
-    }                                          \
+#define VM_PRELUDE_2(_size) {                                \
+    if (vm_shouldskip(vm, instr.condition)) {                \
+        vm_skipparam(vm, _size, instr.target, instr.offset); \
+        vm_skipparam(vm, _size, instr.source, instr.offset); \
+        break;                                               \
+    }                                                        \
 }
-
-#define VM_IMPL_JMP(_sourcemap) {                                      \
-    VM_PRELUDE_1(SIZE32);                                              \
-    vm->pointer_instr_mut = _sourcemap(vm_source32(vm, instr.source)); \
-    break;                                                             \
-}
-
-#define VM_IMPL_LOOP(_sourcemap) {                                         \
-    if (                                                                   \
-        !vm_shouldskip(vm, instr.condition) &&                             \
-        (vm->registers[FOX32_REGISTER_LOOP] -= 1) != 0                     \
-    ) {                                                                    \
-        vm->pointer_instr_mut = _sourcemap(vm_source32(vm, instr.source)); \
-    } else {                                                               \
-        vm_skipparam(vm, SIZE32, instr.source);                            \
-    }                                                                      \
-    break;                                                                 \
+#define VM_PRELUDE_BIT(_size) {                              \
+    if (vm_shouldskip(vm, instr.condition)) {                \
+        vm_skipparam(vm, _size, instr.target, instr.offset); \
+        vm_skipparam(vm, SIZE8, instr.source, instr.offset); \
+        break;                                               \
+    }                                                        \
 }
 
-#define VM_IMPL_CALL(_sourcemap) {                         \
-    VM_PRELUDE_1(SIZE32);                                  \
-    uint32_t pointer_call = vm_source32(vm, instr.source); \
-    vm_push32(vm, vm->pointer_instr_mut);                  \
-    vm->pointer_instr_mut = _sourcemap(pointer_call);      \
-    break;                                                 \
+#define VM_IMPL_JMP(_sourcemap) {                                                    \
+    VM_PRELUDE_1(SIZE32);                                                            \
+    vm->pointer_instr_mut = _sourcemap(vm_source32(vm, instr.source, instr.offset)); \
+    break;                                                                           \
+}
+
+#define VM_IMPL_LOOP(_sourcemap) {                                                       \
+    if (                                                                                 \
+        !vm_shouldskip(vm, instr.condition) &&                                           \
+        (vm->registers[FOX32_REGISTER_LOOP] -= 1) != 0                                   \
+    ) {                                                                                  \
+        vm->pointer_instr_mut = _sourcemap(vm_source32(vm, instr.source, instr.offset)); \
+    } else {                                                                             \
+        vm_skipparam(vm, SIZE32, instr.source, instr.offset);                            \
+    }                                                                                    \
+    break;                                                                               \
+}
+
+#define VM_IMPL_CALL(_sourcemap) {                                       \
+    VM_PRELUDE_1(SIZE32);                                                \
+    uint32_t pointer_call = vm_source32(vm, instr.source, instr.offset); \
+    vm_push32(vm, vm->pointer_instr_mut);                                \
+    vm->pointer_instr_mut = _sourcemap(pointer_call);                    \
+    break;                                                               \
 }
 
 // make sure NOT to update the stack pointer until the full instruction has
 // been read, and the target has been written. otherwise a pagefault halfway
 // through could wreak havoc.
 
-#define VM_IMPL_POP(_size, _vm_target, _vm_pop) { \
-    VM_PRELUDE_1(_size);                          \
-    uint32_t oldsp = vm->pointer_stack;           \
-    uint32_t val = _vm_pop(vm);                   \
-    uint32_t newsp = vm->pointer_stack;           \
-    vm->pointer_stack = oldsp;                    \
-    _vm_target(vm, instr.source, val);            \
-    vm->pointer_stack = newsp;                    \
-    break;                                        \
+#define VM_IMPL_POP(_size, _vm_target, _vm_pop) {     \
+    VM_PRELUDE_1(_size);                              \
+    uint32_t oldsp = vm->pointer_stack;               \
+    uint32_t val = _vm_pop(vm);                       \
+    uint32_t newsp = vm->pointer_stack;               \
+    vm->pointer_stack = oldsp;                        \
+    _vm_target(vm, instr.source, val, instr.offset);  \
+    vm->pointer_stack = newsp;                        \
+    break;                                            \
 }
 
-#define VM_IMPL_PUSH(_size, _vm_source, _vm_push) { \
-    VM_PRELUDE_1(_size);                            \
-    _vm_push(vm, _vm_source(vm, instr.source));     \
-    break;                                          \
+#define VM_IMPL_PUSH(_size, _vm_source, _vm_push) {           \
+    VM_PRELUDE_1(_size);                                      \
+    _vm_push(vm, _vm_source(vm, instr.source, instr.offset)); \
+    break;                                                    \
 }
 
-#define VM_IMPL_MOV(_size, _vm_source, _vm_target) {            \
-    VM_PRELUDE_2(_size);                                        \
-    _vm_target(vm, instr.target, _vm_source(vm, instr.source)); \
-    break;                                                      \
+#define VM_IMPL_MOV(_size, _vm_source, _vm_target) {                                        \
+    VM_PRELUDE_2(_size);                                                                    \
+    _vm_target(vm, instr.target, _vm_source(vm, instr.source, instr.offset), instr.offset); \
+    break;                                                                                  \
 }
 
 #define VM_IMPL_NOT(_size, _type, _vm_source_stay, _vm_target) { \
     VM_PRELUDE_1(_size);                                         \
-    _type v = _vm_source_stay(vm, instr.source);                 \
+    _type v = _vm_source_stay(vm, instr.source, instr.offset);   \
     _type x = ~v;                                                \
-    _vm_target(vm, instr.source, x);                             \
+    _vm_target(vm, instr.source, x, instr.offset);               \
     vm->flag_zero = x == 0;                                      \
     break;                                                       \
 }
 
 #define VM_IMPL_INC(_size, _type, _vm_source_stay, _vm_target, _oper) { \
     VM_PRELUDE_1(_size);                                                \
-    _type v = _vm_source_stay(vm, instr.source);                        \
+    _type v = _vm_source_stay(vm, instr.source, instr.offset);          \
     _type x;                                                            \
     bool carry = _oper(v, 1 << instr.target, &x);                       \
-    _vm_target(vm, instr.source, x);                                    \
+    _vm_target(vm, instr.source, x, instr.offset);                      \
     vm->flag_carry = carry;                                             \
     vm->flag_zero = x == 0;                                             \
     break;                                                              \
@@ -844,11 +857,11 @@ static void vm_skipparam(vm_t *vm, uint32_t size, uint8_t prtype) {
 
 #define VM_IMPL_ADD(_size, _type, _type_target, _vm_source, _vm_source_stay, _vm_target, _oper) { \
     VM_PRELUDE_2(_size);                                                                          \
-    _type a = (_type) _vm_source(vm, instr.source);                                               \
-    _type b = (_type) _vm_source_stay(vm, instr.target);                                          \
+    _type a = (_type) _vm_source(vm, instr.source, instr.offset);                                 \
+    _type b = (_type) _vm_source_stay(vm, instr.target, instr.offset);                            \
     _type x;                                                                                      \
     bool carry = _oper(b, a, &x);                                                                 \
-    _vm_target(vm, instr.target, (_type_target) x);                                               \
+    _vm_target(vm, instr.target, (_type_target) x, instr.offset);                                 \
     vm->flag_carry = carry;                                                                       \
     vm->flag_zero = x == 0;                                                                       \
     break;                                                                                        \
@@ -856,45 +869,55 @@ static void vm_skipparam(vm_t *vm, uint32_t size, uint8_t prtype) {
 
 #define VM_IMPL_AND(_size, _type, _type_target, _vm_source, _vm_source_stay, _vm_target, _oper) { \
     VM_PRELUDE_2(_size);                                                                          \
-    _type a = (_type) _vm_source(vm, instr.source);                                               \
-    _type b = (_type) _vm_source_stay(vm, instr.target);                                          \
+    _type a = (_type) _vm_source(vm, instr.source, instr.offset);                                 \
+    _type b = (_type) _vm_source_stay(vm, instr.target, instr.offset);                            \
     _type x = _oper(b, a);                                                                        \
-    _vm_target(vm, instr.target, (_type_target) x);                                               \
+    _vm_target(vm, instr.target, (_type_target) x, instr.offset);                                 \
+    vm->flag_zero = x == 0;                                                                       \
+    break;                                                                                        \
+}
+
+#define VM_IMPL_SHIFT(_size, _type, _type_target, _vm_source, _vm_source_stay, _vm_target, _oper){\
+    VM_PRELUDE_BIT(_size);                                                                        \
+    _type a = (_type) vm_source8(vm, instr.source, instr.offset);                                 \
+    _type b = (_type) _vm_source_stay(vm, instr.target, instr.offset);                            \
+    _type x = _oper(b, a);                                                                        \
+    _vm_target(vm, instr.target, (_type_target) x, instr.offset);                                 \
     vm->flag_zero = x == 0;                                                                       \
     break;                                                                                        \
 }
 
 #define VM_IMPL_DIV(_size, _type, _type_target, _vm_source, _vm_source_stay, _vm_target, _oper) { \
     VM_PRELUDE_2(_size);                                                                          \
-    _type a = (_type) _vm_source(vm, instr.source);                                               \
-    _type b = (_type) _vm_source_stay(vm, instr.target);                                          \
+    _type a = (_type) _vm_source(vm, instr.source, instr.offset);                                 \
+    _type b = (_type) _vm_source_stay(vm, instr.target, instr.offset);                            \
     if (a == 0) {                                                                                 \
         vm_panic(vm, FOX32_ERR_DIVZERO);                                                          \
         break;                                                                                    \
     }                                                                                             \
     _type x = _oper(b, a);                                                                        \
-    _vm_target(vm, instr.target, (_type_target) x);                                               \
+    _vm_target(vm, instr.target, (_type_target) x, instr.offset);                                 \
     vm->flag_zero = x == 0;                                                                       \
     break;                                                                                        \
 }
 
-#define VM_IMPL_CMP(_size, _type, _vm_source) { \
-    VM_PRELUDE_2(_size);                        \
-    _type a = _vm_source(vm, instr.source);     \
-    _type b = _vm_source(vm, instr.target);     \
-    _type x;                                    \
-    vm->flag_carry = CHECKED_SUB(b, a, &x);     \
-    vm->flag_zero = x == 0;                     \
-    break;                                      \
+#define VM_IMPL_CMP(_size, _type, _vm_source) {           \
+    VM_PRELUDE_2(_size);                                  \
+    _type a = _vm_source(vm, instr.source, instr.offset); \
+    _type b = _vm_source(vm, instr.target, instr.offset); \
+    _type x;                                              \
+    vm->flag_carry = CHECKED_SUB(b, a, &x);               \
+    vm->flag_zero = x == 0;                               \
+    break;                                                \
 }
 
-#define VM_IMPL_BTS(_size, _type, _vm_source) { \
-    VM_PRELUDE_2(_size);                        \
-    _type a = _vm_source(vm, instr.source);     \
-    _type b = _vm_source(vm, instr.target);     \
-    _type x = b & (1 << a);                     \
-    vm->flag_zero = x == 0;                     \
-    break;                                      \
+#define VM_IMPL_BTS(_size, _type, _vm_source) {           \
+    VM_PRELUDE_BIT(_size);                                \
+    _type a = vm_source8(vm, instr.source, instr.offset); \
+    _type b = _vm_source(vm, instr.target, instr.offset); \
+    _type x = b & (1 << a);                               \
+    vm->flag_zero = x == 0;                               \
+    break;                                                \
 }
 
 static void vm_debug(vm_t *vm, asm_instr_t instr, uint32_t ip, uint32_t sp) {
@@ -948,20 +971,20 @@ static void vm_execute(vm_t *vm) {
 
         case OP(SZ_WORD, OP_IN): {
             VM_PRELUDE_2(SIZE32);
-            vm_target32(vm, instr.target, vm_io_read(vm, vm_source32(vm, instr.source)));
+            vm_target32(vm, instr.target, vm_io_read(vm, vm_source32(vm, instr.source, 0)), instr.offset);
             break;
         };
         case OP(SZ_WORD, OP_OUT): {
             VM_PRELUDE_2(SIZE32);
-            uint32_t value = vm_source32(vm, instr.source);
-            uint32_t port = vm_source32(vm, instr.target);
+            uint32_t value = vm_source32(vm, instr.source, instr.offset);
+            uint32_t port = vm_source32(vm, instr.target, instr.offset);
             vm_io_write(vm, port, value);
             break;
         };
 
         case OP(SZ_WORD, OP_RTA): {
             VM_PRELUDE_2(SIZE32);
-            vm_target32(vm, instr.target, instr_base + vm_source32(vm, instr.source));
+            vm_target32(vm, instr.target, instr_base + vm_source32(vm, instr.source, instr.offset), instr.offset);
             break;
         };
 
@@ -1060,29 +1083,29 @@ static void vm_execute(vm_t *vm) {
         case OP(SZ_HALF, OP_OR): VM_IMPL_AND(SIZE16, uint16_t, uint16_t, vm_source16, vm_source16_stay, vm_target16, OPER_OR);
         case OP(SZ_WORD, OP_OR): VM_IMPL_AND(SIZE32, uint32_t, uint32_t, vm_source32, vm_source32_stay, vm_target32, OPER_OR);
 
-        case OP(SZ_BYTE, OP_SLA): VM_IMPL_AND(SIZE8, uint8_t, uint8_t, vm_source8, vm_source8_stay, vm_target8, OPER_SHIFT_LEFT);
-        case OP(SZ_HALF, OP_SLA): VM_IMPL_AND(SIZE16, uint16_t, uint16_t, vm_source16, vm_source16_stay, vm_target16, OPER_SHIFT_LEFT);
-        case OP(SZ_WORD, OP_SLA): VM_IMPL_AND(SIZE32, uint32_t, uint32_t, vm_source32, vm_source32_stay, vm_target32, OPER_SHIFT_LEFT);
-        case OP(SZ_BYTE, OP_SRL): VM_IMPL_AND(SIZE8, uint8_t, uint8_t, vm_source8, vm_source8_stay, vm_target8, OPER_SHIFT_RIGHT);
-        case OP(SZ_HALF, OP_SRL): VM_IMPL_AND(SIZE16, uint16_t, uint16_t, vm_source16, vm_source16_stay, vm_target16, OPER_SHIFT_RIGHT);
-        case OP(SZ_WORD, OP_SRL): VM_IMPL_AND(SIZE32, uint32_t, uint32_t, vm_source32, vm_source32_stay, vm_target32, OPER_SHIFT_RIGHT);
-        case OP(SZ_BYTE, OP_SRA): VM_IMPL_AND(SIZE8, int8_t, uint8_t, vm_source8, vm_source8_stay, vm_target8, OPER_SHIFT_RIGHT);
-        case OP(SZ_HALF, OP_SRA): VM_IMPL_AND(SIZE16, int16_t, uint16_t, vm_source16, vm_source16_stay, vm_target16, OPER_SHIFT_RIGHT);
-        case OP(SZ_WORD, OP_SRA): VM_IMPL_AND(SIZE32, int32_t, uint32_t, vm_source32, vm_source32_stay, vm_target32, OPER_SHIFT_RIGHT);
+        case OP(SZ_BYTE, OP_SLA): VM_IMPL_SHIFT(SIZE8, uint8_t, uint8_t, vm_source8, vm_source8_stay, vm_target8, OPER_SHIFT_LEFT);
+        case OP(SZ_HALF, OP_SLA): VM_IMPL_SHIFT(SIZE16, uint16_t, uint16_t, vm_source16, vm_source16_stay, vm_target16, OPER_SHIFT_LEFT);
+        case OP(SZ_WORD, OP_SLA): VM_IMPL_SHIFT(SIZE32, uint32_t, uint32_t, vm_source32, vm_source32_stay, vm_target32, OPER_SHIFT_LEFT);
+        case OP(SZ_BYTE, OP_SRL): VM_IMPL_SHIFT(SIZE8, uint8_t, uint8_t, vm_source8, vm_source8_stay, vm_target8, OPER_SHIFT_RIGHT);
+        case OP(SZ_HALF, OP_SRL): VM_IMPL_SHIFT(SIZE16, uint16_t, uint16_t, vm_source16, vm_source16_stay, vm_target16, OPER_SHIFT_RIGHT);
+        case OP(SZ_WORD, OP_SRL): VM_IMPL_SHIFT(SIZE32, uint32_t, uint32_t, vm_source32, vm_source32_stay, vm_target32, OPER_SHIFT_RIGHT);
+        case OP(SZ_BYTE, OP_SRA): VM_IMPL_SHIFT(SIZE8, int8_t, uint8_t, vm_source8, vm_source8_stay, vm_target8, OPER_SHIFT_RIGHT);
+        case OP(SZ_HALF, OP_SRA): VM_IMPL_SHIFT(SIZE16, int16_t, uint16_t, vm_source16, vm_source16_stay, vm_target16, OPER_SHIFT_RIGHT);
+        case OP(SZ_WORD, OP_SRA): VM_IMPL_SHIFT(SIZE32, int32_t, uint32_t, vm_source32, vm_source32_stay, vm_target32, OPER_SHIFT_RIGHT);
 
-        case OP(SZ_BYTE, OP_ROL): VM_IMPL_AND(SIZE8, uint8_t, uint8_t, vm_source8, vm_source8_stay, vm_target8, ROTATE_LEFT8);
-        case OP(SZ_HALF, OP_ROL): VM_IMPL_AND(SIZE16, uint16_t, uint16_t, vm_source16, vm_source16_stay, vm_target16, ROTATE_LEFT16);
-        case OP(SZ_WORD, OP_ROL): VM_IMPL_AND(SIZE32, uint32_t, uint32_t, vm_source32, vm_source32_stay, vm_target32, ROTATE_LEFT32);
-        case OP(SZ_BYTE, OP_ROR): VM_IMPL_AND(SIZE8, uint8_t, uint8_t, vm_source8, vm_source8_stay, vm_target8, ROTATE_RIGHT8);
-        case OP(SZ_HALF, OP_ROR): VM_IMPL_AND(SIZE16, uint16_t, uint16_t, vm_source16, vm_source16_stay, vm_target16, ROTATE_RIGHT16);
-        case OP(SZ_WORD, OP_ROR): VM_IMPL_AND(SIZE32, uint32_t, uint32_t, vm_source32, vm_source32_stay, vm_target32, ROTATE_RIGHT32);
+        case OP(SZ_BYTE, OP_ROL): VM_IMPL_SHIFT(SIZE8, uint8_t, uint8_t, vm_source8, vm_source8_stay, vm_target8, ROTATE_LEFT8);
+        case OP(SZ_HALF, OP_ROL): VM_IMPL_SHIFT(SIZE16, uint16_t, uint16_t, vm_source16, vm_source16_stay, vm_target16, ROTATE_LEFT16);
+        case OP(SZ_WORD, OP_ROL): VM_IMPL_SHIFT(SIZE32, uint32_t, uint32_t, vm_source32, vm_source32_stay, vm_target32, ROTATE_LEFT32);
+        case OP(SZ_BYTE, OP_ROR): VM_IMPL_SHIFT(SIZE8, uint8_t, uint8_t, vm_source8, vm_source8_stay, vm_target8, ROTATE_RIGHT8);
+        case OP(SZ_HALF, OP_ROR): VM_IMPL_SHIFT(SIZE16, uint16_t, uint16_t, vm_source16, vm_source16_stay, vm_target16, ROTATE_RIGHT16);
+        case OP(SZ_WORD, OP_ROR): VM_IMPL_SHIFT(SIZE32, uint32_t, uint32_t, vm_source32, vm_source32_stay, vm_target32, ROTATE_RIGHT32);
 
-        case OP(SZ_BYTE, OP_BSE): VM_IMPL_AND(SIZE8, uint8_t, uint8_t, vm_source8, vm_source8_stay, vm_target8, OPER_BIT_SET);
-        case OP(SZ_HALF, OP_BSE): VM_IMPL_AND(SIZE16, uint16_t, uint16_t, vm_source16, vm_source16_stay, vm_target16, OPER_BIT_SET);
-        case OP(SZ_WORD, OP_BSE): VM_IMPL_AND(SIZE32, uint32_t, uint32_t, vm_source32, vm_source32_stay, vm_target32, OPER_BIT_SET);
-        case OP(SZ_BYTE, OP_BCL): VM_IMPL_AND(SIZE8, uint8_t, uint8_t, vm_source8, vm_source8_stay, vm_target8, OPER_BIT_CLEAR);
-        case OP(SZ_HALF, OP_BCL): VM_IMPL_AND(SIZE16, uint16_t, uint16_t, vm_source16, vm_source16_stay, vm_target16, OPER_BIT_CLEAR);
-        case OP(SZ_WORD, OP_BCL): VM_IMPL_AND(SIZE32, uint32_t, uint32_t, vm_source32, vm_source32_stay, vm_target32, OPER_BIT_CLEAR);
+        case OP(SZ_BYTE, OP_BSE): VM_IMPL_SHIFT(SIZE8, uint8_t, uint8_t, vm_source8, vm_source8_stay, vm_target8, OPER_BIT_SET);
+        case OP(SZ_HALF, OP_BSE): VM_IMPL_SHIFT(SIZE16, uint16_t, uint16_t, vm_source16, vm_source16_stay, vm_target16, OPER_BIT_SET);
+        case OP(SZ_WORD, OP_BSE): VM_IMPL_SHIFT(SIZE32, uint32_t, uint32_t, vm_source32, vm_source32_stay, vm_target32, OPER_BIT_SET);
+        case OP(SZ_BYTE, OP_BCL): VM_IMPL_SHIFT(SIZE8, uint8_t, uint8_t, vm_source8, vm_source8_stay, vm_target8, OPER_BIT_CLEAR);
+        case OP(SZ_HALF, OP_BCL): VM_IMPL_SHIFT(SIZE16, uint16_t, uint16_t, vm_source16, vm_source16_stay, vm_target16, OPER_BIT_CLEAR);
+        case OP(SZ_WORD, OP_BCL): VM_IMPL_SHIFT(SIZE32, uint32_t, uint32_t, vm_source32, vm_source32_stay, vm_target32, OPER_BIT_CLEAR);
 
         case OP(SZ_BYTE, OP_CMP): VM_IMPL_CMP(SIZE8, uint8_t, vm_source8);
         case OP(SZ_HALF, OP_CMP): VM_IMPL_CMP(SIZE16, uint16_t, vm_source16);
@@ -1104,7 +1127,7 @@ static void vm_execute(vm_t *vm) {
         };
         case OP(SZ_WORD, OP_INT): {
             VM_PRELUDE_1(SIZE32);
-            uint32_t intr = vm_source32(vm, instr.source);
+            uint32_t intr = vm_source32(vm, instr.source, instr.offset);
             vm->pointer_instr = vm->pointer_instr_mut;
             fox32_raise(vm, intr);
             vm->pointer_instr_mut = vm->pointer_instr;
@@ -1112,12 +1135,12 @@ static void vm_execute(vm_t *vm) {
         };
         case OP(SZ_WORD, OP_TLB): {
             VM_PRELUDE_1(SIZE32);
-            set_and_flush_tlb(vm_source32(vm, instr.source));
+            set_and_flush_tlb(vm_source32(vm, instr.source, instr.offset));
             break;
         };
         case OP(SZ_WORD, OP_FLP): {
             VM_PRELUDE_1(SIZE32);
-            flush_single_page(vm_source32(vm, instr.source));
+            flush_single_page(vm_source32(vm, instr.source, instr.offset));
             break;
         };
 
