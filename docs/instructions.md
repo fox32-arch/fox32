@@ -8,8 +8,8 @@ description of the fox32 CPU and instruction encoding details, see [cpu.md](./cp
 
 ### ADD: add
 ### SUB: subtract
-### INC: increment (add 1)
-### DEC: decrement (subtract 1)
+### INC: increment (add 1/2/4/8)
+### DEC: decrement (subtract 1/2/4/8)
 ### CMP: compare
 ### AND: bitwise AND
 ### OR: bitwise OR

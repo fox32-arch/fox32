@@ -1,7 +1,7 @@
 # Encoding
 ```
-size instr  . cond dest src <src>          <dest>
-xx   xxxxxx 0 xxx  xx   xx  <8,16,32 bits> <8,16,32 bits>
+size instr  off cond dest src <src>          <srcoff> <dest>         <dstoff>
+xx   xxxxxx x   xxx  xx   xx  <8,16,32 bits> <8 bits> <8,16,32 bits> <8 bits>
 ```
 
 
@@ -49,3 +49,6 @@ If the instruction doesn't allow variable sizes or a size was not specified, set
 | 0b01 | register (pointer)  |
 | 0b10 | immediate           |
 | 0b11 | immediate (pointer) |
+
+# Register Pointer Offset
+The off field indicates that each operand of type 0b01 (register pointer) has an 8 bit immediate.  This immediate is added to the value of the register before derefencing.
