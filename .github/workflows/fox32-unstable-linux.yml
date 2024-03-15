@@ -12,26 +12,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-
-      - name: Download latest fox32rom artifact
-        uses: dawidd6/action-download-artifact@v2
+      - uses: cachix/install-nix-action@v22
         with:
-          repo: fox32-arch/fox32rom
-          workflow: fox32rom-unstable.yml
-          workflow_conclusion: success
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Move fox32.rom into the root folder
-        run: |
-          mv fox32.rom/ download/
-          cp download/fox32.rom ./fox32.rom
+      - name: Build fox32
+        run: nix build -L .#fox32
 
-      - name: Install libsdl2-dev and vim
-        run: |
-          sudo apt update
-          sudo apt install -y libsdl2-dev vim
-
-      - name: Build
-        run: make
+      - name: Patch
+        run: nix run nixpkgs#patchelf -- result/bin/fox32 --set-interpreter /lib64/ld-linux-x86-64.so.2 --output fox32
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v2
