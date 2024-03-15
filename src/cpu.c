@@ -679,13 +679,13 @@ static void vm_target8(vm_t *vm, uint8_t prtype, uint8_t value, uint8_t offset) 
     VM_TARGET_BODY(vm_write8, (*vm_findlocal(vm, local) & 0xFFFFFF00) | (uint32_t) value, offset)
 }
 static void vm_target8_zero(vm_t *vm, uint8_t prtype, uint8_t value, uint8_t offset) {
-    VM_TARGET_BODY(vm_write8, (uint32_t) value, offset)
+    VM_TARGET_BODY(vm_write32, (uint32_t) value, offset)
 }
 static void vm_target16(vm_t *vm, uint8_t prtype, uint16_t value, uint8_t offset) {
     VM_TARGET_BODY(vm_write16, (*vm_findlocal(vm, local) & 0xFFFF0000) | (uint32_t) value, offset)
 }
 static void vm_target16_zero(vm_t *vm, uint8_t prtype, uint16_t value, uint8_t offset) {
-    VM_TARGET_BODY(vm_write16, (uint32_t) value, offset)
+    VM_TARGET_BODY(vm_write32, (uint32_t) value, offset)
 }
 static void vm_target32(vm_t *vm, uint8_t prtype, uint32_t value, uint8_t offset) {
     VM_TARGET_BODY(vm_write32, value, offset)
