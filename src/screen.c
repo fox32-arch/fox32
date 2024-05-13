@@ -44,6 +44,8 @@ void ScreenInit() {
         exit(1);
     }
 
+    SDL_RenderSetLogicalSize(ScreenRenderer, WindowWidth, WindowHeight);
+
     WindowRect = (SDL_Rect) {
         .w = WindowWidth,
         .h = WindowHeight
