@@ -110,7 +110,7 @@ data.16 0x8700 data.8 20 data.8 1
 | 0x04  | SLA    | src+tgt  | 8/16/32 | shift left
 | 0x05  | SRA    | src+tgt  | 8/16/32 | shift right arithmetic (with sign extension)
 | 0x06  | BSE    | src+tgt  | 8/16/32 | bit set
-| 0x07  | CMP    | src+tgt  | 8/16/32 | compare
+| 0x07  | CMP    | src+tgt  | 8/16/32 | unsigned compare
 | 0x08  | JMP    | src      |      32 | absolute jump
 | 0x09  | RJMP   | src      |      32 | relative jump
 | 0x0A  | PUSH   | src      | 8/16/32 | push value to stack
@@ -148,6 +148,7 @@ data.16 0x8700 data.8 20 data.8 1
 | 0x33  | NOT    | src      | 8/16/32 | bitwise NOT
 | 0x34  | IDIV   | src+tgt  | 8/16/32 | divide (signed)
 | 0x35  | IREM   | src+tgt  | 8/16/32 | remainder (signed)
+| 0x37  | ICMP   | src+tgt  | 8/16/32 | signed compare
 | 0x39  | RTA    | src+tgt  |      32 | calculate address relative to instruction pointer
 | 0x3A  | RETI   | none     |      32 | return from interrupt
 | 0x3D  | FLP    | src      |      32 | flush page from TLB

@@ -96,6 +96,7 @@ enum {
     OP_NOT   = 0x33,
     OP_IDIV  = 0x34,
     OP_IREM  = 0x35,
+    OP_ICMP  = 0x37,
     OP_RTA   = 0x39,
     OP_RETI  = 0x3A,
     OP_FLP   = 0x3D,
@@ -246,6 +247,7 @@ static const asm_iinfo_t asm_iinfos[256] = {
     [OP_NOT  ] = { "NOT  ", 1 },
     [OP_IDIV ] = { "IDIV ", 2 },
     [OP_IREM ] = { "IREM ", 2 },
+    [OP_ICMP ] = { "ICMP ", 2 },
     [OP_RTA  ] = { "RTA  ", 2 },
     [OP_RETI ] = { "RETI ", 0 },
     [OP_FLP  ] = { "FLP  ", 1 }
@@ -1110,6 +1112,9 @@ static void vm_execute(vm_t *vm) {
         case OP(SZ_BYTE, OP_CMP): VM_IMPL_CMP(SIZE8, uint8_t, vm_source8);
         case OP(SZ_HALF, OP_CMP): VM_IMPL_CMP(SIZE16, uint16_t, vm_source16);
         case OP(SZ_WORD, OP_CMP): VM_IMPL_CMP(SIZE32, uint32_t, vm_source32);
+        case OP(SZ_BYTE, OP_ICMP): VM_IMPL_CMP(SIZE8, int8_t, vm_source8);
+        case OP(SZ_HALF, OP_ICMP): VM_IMPL_CMP(SIZE16, int16_t, vm_source16);
+        case OP(SZ_WORD, OP_ICMP): VM_IMPL_CMP(SIZE32, int32_t, vm_source32);
 
         case OP(SZ_BYTE, OP_BTS): VM_IMPL_BTS(SIZE8, uint8_t, vm_source8);
         case OP(SZ_HALF, OP_BTS): VM_IMPL_BTS(SIZE16, uint16_t, vm_source16);
