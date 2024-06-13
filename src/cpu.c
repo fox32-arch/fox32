@@ -814,9 +814,9 @@ static void vm_skipparam(vm_t *vm, uint32_t size, uint8_t prtype, uint8_t offset
     VM_PRELUDE_1(_size);                                                                                              \
     uint32_t pointer_call;                                                                                            \
     switch (_size) {                                                                                                  \
-        case SIZE8: pointer_call = _sourcemap((int8_t)vm_source8(vm, instr.source, instr.offset)); break;             \
-        case SIZE16: pointer_call = _sourcemap((int16_t)vm_source16(vm, instr.source, instr.offset)); break;          \
-        default: pointer_call = _sourcemap(vm_source32(vm, instr.source, instr.offset)); break;                       \
+        case SIZE8: pointer_call = (int8_t)vm_source8(vm, instr.source, instr.offset); break;                         \
+        case SIZE16: pointer_call = (int16_t)vm_source16(vm, instr.source, instr.offset); break;                      \
+        default: pointer_call = vm_source32(vm, instr.source, instr.offset); break;                                   \
     }                                                                                                                 \
     vm_push32(vm, vm->pointer_instr_mut);                                                                             \
     switch (_size) {                                                                                                  \
