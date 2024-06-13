@@ -784,30 +784,47 @@ static void vm_skipparam(vm_t *vm, uint32_t size, uint8_t prtype, uint8_t offset
     }                                                        \
 }
 
-#define VM_IMPL_JMP(_sourcemap) {                                                    \
-    VM_PRELUDE_1(SIZE32);                                                            \
-    vm->pointer_instr_mut = _sourcemap(vm_source32(vm, instr.source, instr.offset)); \
-    break;                                                                           \
+#define VM_IMPL_JMP(_size, _sourcemap) {                                                                              \
+    VM_PRELUDE_1(_size);                                                                                              \
+    switch (_size) {                                                                                                  \
+        case SIZE8: vm->pointer_instr_mut = _sourcemap((int8_t)vm_source8(vm, instr.source, instr.offset)); break;    \
+        case SIZE16: vm->pointer_instr_mut = _sourcemap((int16_t)vm_source16(vm, instr.source, instr.offset)); break; \
+        default: vm->pointer_instr_mut = _sourcemap(vm_source32(vm, instr.source, instr.offset)); break;              \
+    }                                                                                                                 \
+    break;                                                                                                            \
 }
 
-#define VM_IMPL_LOOP(_sourcemap) {                                                       \
-    if (                                                                                 \
-        !vm_shouldskip(vm, instr.condition) &&                                           \
-        (vm->registers[FOX32_REGISTER_LOOP] -= 1) != 0                                   \
-    ) {                                                                                  \
-        vm->pointer_instr_mut = _sourcemap(vm_source32(vm, instr.source, instr.offset)); \
-    } else {                                                                             \
-        vm_skipparam(vm, SIZE32, instr.source, instr.offset);                            \
-    }                                                                                    \
-    break;                                                                               \
+#define VM_IMPL_LOOP(_size, _sourcemap) {                                                                                 \
+    if (                                                                                                                  \
+        !vm_shouldskip(vm, instr.condition) &&                                                                            \
+        (vm->registers[FOX32_REGISTER_LOOP] -= 1) != 0                                                                    \
+    ) {                                                                                                                   \
+        switch (_size) {                                                                                                  \
+            case SIZE8: vm->pointer_instr_mut = _sourcemap((int8_t)vm_source8(vm, instr.source, instr.offset)); break;    \
+            case SIZE16: vm->pointer_instr_mut = _sourcemap((int16_t)vm_source16(vm, instr.source, instr.offset)); break; \
+            default: vm->pointer_instr_mut = _sourcemap(vm_source32(vm, instr.source, instr.offset)); break;              \
+        }                                                                                                                 \
+    } else {                                                                                                              \
+        vm_skipparam(vm, _size, instr.source, instr.offset);                                                              \
+    }                                                                                                                     \
+    break;                                                                                                                \
 }
 
-#define VM_IMPL_CALL(_sourcemap) {                                       \
-    VM_PRELUDE_1(SIZE32);                                                \
-    uint32_t pointer_call = vm_source32(vm, instr.source, instr.offset); \
-    vm_push32(vm, vm->pointer_instr_mut);                                \
-    vm->pointer_instr_mut = _sourcemap(pointer_call);                    \
-    break;                                                               \
+#define VM_IMPL_CALL(_size, _sourcemap) {                                                                             \
+    VM_PRELUDE_1(_size);                                                                                              \
+    uint32_t pointer_call;                                                                                            \
+    switch (_size) {                                                                                                  \
+        case SIZE8: pointer_call = _sourcemap((int8_t)vm_source8(vm, instr.source, instr.offset)); break;             \
+        case SIZE16: pointer_call = _sourcemap((int16_t)vm_source16(vm, instr.source, instr.offset)); break;          \
+        default: pointer_call = _sourcemap(vm_source32(vm, instr.source, instr.offset)); break;                       \
+    }                                                                                                                 \
+    vm_push32(vm, vm->pointer_instr_mut);                                                                             \
+    switch (_size) {                                                                                                  \
+        case SIZE8: vm->pointer_instr_mut = _sourcemap((int8_t)pointer_call); break;                                  \
+        case SIZE16: vm->pointer_instr_mut = _sourcemap((int16_t)pointer_call); break;                                \
+        default: vm->pointer_instr_mut = _sourcemap(pointer_call); break;                                             \
+    }                                                                                                                 \
+    break;                                                                                                            \
 }
 
 // make sure NOT to update the stack pointer until the full instruction has
@@ -984,6 +1001,16 @@ static void vm_execute(vm_t *vm) {
             break;
         };
 
+        case OP(SZ_BYTE, OP_RTA): {
+            VM_PRELUDE_2(SIZE8);
+            vm_target32(vm, instr.target, instr_base + (int8_t)vm_source8(vm, instr.source, instr.offset), instr.offset);
+            break;
+        };
+        case OP(SZ_HALF, OP_RTA): {
+            VM_PRELUDE_2(SIZE16);
+            vm_target32(vm, instr.target, instr_base + (int16_t)vm_source16(vm, instr.source, instr.offset), instr.offset);
+            break;
+        };
         case OP(SZ_WORD, OP_RTA): {
             VM_PRELUDE_2(SIZE32);
             vm_target32(vm, instr.target, instr_base + vm_source32(vm, instr.source, instr.offset), instr.offset);
@@ -1016,12 +1043,19 @@ static void vm_execute(vm_t *vm) {
             break;
         };
 
-        case OP(SZ_WORD, OP_JMP): VM_IMPL_JMP(SOURCEMAP_IDENTITY);
-        case OP(SZ_WORD, OP_CALL): VM_IMPL_CALL(SOURCEMAP_IDENTITY);
-        case OP(SZ_WORD, OP_LOOP): VM_IMPL_LOOP(SOURCEMAP_IDENTITY);
-        case OP(SZ_WORD, OP_RJMP): VM_IMPL_JMP(SOURCEMAP_RELATIVE);
-        case OP(SZ_WORD, OP_RCALL): VM_IMPL_CALL(SOURCEMAP_RELATIVE);
-        case OP(SZ_WORD, OP_RLOOP): VM_IMPL_LOOP(SOURCEMAP_RELATIVE);
+        case OP(SZ_WORD, OP_JMP): VM_IMPL_JMP(SIZE32, SOURCEMAP_IDENTITY);
+        case OP(SZ_WORD, OP_CALL): VM_IMPL_CALL(SIZE32, SOURCEMAP_IDENTITY);
+        case OP(SZ_WORD, OP_LOOP): VM_IMPL_LOOP(SIZE32, SOURCEMAP_IDENTITY);
+
+        case OP(SZ_BYTE, OP_RJMP): VM_IMPL_JMP(SIZE8, SOURCEMAP_RELATIVE);
+        case OP(SZ_BYTE, OP_RCALL): VM_IMPL_CALL(SIZE8, SOURCEMAP_RELATIVE);
+        case OP(SZ_BYTE, OP_RLOOP): VM_IMPL_LOOP(SIZE8, SOURCEMAP_RELATIVE);
+        case OP(SZ_HALF, OP_RJMP): VM_IMPL_JMP(SIZE16, SOURCEMAP_RELATIVE);
+        case OP(SZ_HALF, OP_RCALL): VM_IMPL_CALL(SIZE16, SOURCEMAP_RELATIVE);
+        case OP(SZ_HALF, OP_RLOOP): VM_IMPL_LOOP(SIZE16, SOURCEMAP_RELATIVE);
+        case OP(SZ_WORD, OP_RJMP): VM_IMPL_JMP(SIZE32, SOURCEMAP_RELATIVE);
+        case OP(SZ_WORD, OP_RCALL): VM_IMPL_CALL(SIZE32, SOURCEMAP_RELATIVE);
+        case OP(SZ_WORD, OP_RLOOP): VM_IMPL_LOOP(SIZE32, SOURCEMAP_RELATIVE);
 
         case OP(SZ_BYTE, OP_POP): VM_IMPL_POP(SIZE8, vm_target8, vm_pop8);
         case OP(SZ_HALF, OP_POP): VM_IMPL_POP(SIZE16, vm_target16, vm_pop16);
