@@ -112,7 +112,7 @@ data.16 0x8700 data.8 20 data.8 1
 | 0x06  | BSE    | src+tgt  | 8/16/32 | bit set
 | 0x07  | CMP    | src+tgt  | 8/16/32 | unsigned compare
 | 0x08  | JMP    | src      |      32 | absolute jump
-| 0x09  | RJMP   | src      |      32 | relative jump
+| 0x09  | RJMP   | src      | 8/16/32 | relative jump
 | 0x0A  | PUSH   | src      | 8/16/32 | push value to stack
 | 0x0B  | IN     | src+tgt  |      32 | get input from I/O bus
 | 0x0C  | ISE    | none     |      32 | set interrupt enable flag
@@ -125,7 +125,7 @@ data.16 0x8700 data.8 20 data.8 1
 | 0x16  | BCL    | src+tgt  | 8/16/32 | bit clear
 | 0x17  | MOV    | src+tgt  | 8/16/32 | move value
 | 0x18  | CALL   | src      |      32 | absolute call
-| 0x19  | RCALL  | src      |      32 | relative call
+| 0x19  | RCALL  | src      | 8/16/32 | relative call
 | 0x1A  | POP    | src      | 8/16/32 | pop value from stack
 | 0x1B  | OUT    | src+tgt  |      32 | output on I/O bus
 | 0x1C  | ICL    | none     |      32 | clear interrupt enable flag
@@ -139,7 +139,7 @@ data.16 0x8700 data.8 20 data.8 1
 | 0x26  | BTS    | src+tgt  | 8/16/32 | test if bit set
 | 0x27  | MOVZ   | src+tgt  | 8/16/32 | move value and clear upper bits in target register
 | 0x28  | LOOP   | src      |      32 | absolute loop
-| 0x29  | RLOOP  | src      |      32 | relative loop
+| 0x29  | RLOOP  | src      | 8/16/32 | relative loop
 | 0x2A  | RET    | none     |      32 | return from function
 | 0x2C  | INT    | src      |      32 | raise interrupt
 | 0x2D  | TLB    | src      |      32 | flush TLB and set page directory pointer
@@ -149,7 +149,7 @@ data.16 0x8700 data.8 20 data.8 1
 | 0x34  | IDIV   | src+tgt  | 8/16/32 | divide (signed)
 | 0x35  | IREM   | src+tgt  | 8/16/32 | remainder (signed)
 | 0x37  | ICMP   | src+tgt  | 8/16/32 | signed compare
-| 0x39  | RTA    | src+tgt  |      32 | calculate address relative to instruction pointer
+| 0x39  | RTA    | src+tgt  | 8/16/32 | calculate address relative to instruction pointer
 | 0x3A  | RETI   | none     |      32 | return from interrupt
 | 0x3D  | FLP    | src      |      32 | flush page from TLB
 

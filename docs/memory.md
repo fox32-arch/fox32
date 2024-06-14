@@ -1,6 +1,6 @@
 # Memory
 
-The memory in a Fox32 system is laid out as follows:
+The memory in a fox32 system is laid out as follows:
 
 |  start     |  end       |  size   | description
 |------------|------------|---------|---------------------------------------
