@@ -924,9 +924,8 @@ static void vm_skipparam(vm_t *vm, uint32_t size, uint8_t prtype, uint8_t offset
     VM_PRELUDE_2(_size);                                  \
     _type a = _vm_source(vm, instr.source, instr.offset); \
     _type b = _vm_source(vm, instr.target, instr.offset); \
-    _type x;                                              \
-    vm->flag_carry = CHECKED_SUB(b, a, &x);               \
-    vm->flag_zero = x == 0;                               \
+    vm->flag_carry = a > b;                               \
+    vm->flag_zero = a == b;                               \
     break;                                                \
 }
 
