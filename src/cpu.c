@@ -372,6 +372,11 @@ static void vm_init(vm_t *vm) {
     vm->io_user = NULL;
     vm->io_read = io_read_default;
     vm->io_write = io_write_default;
+    vm->deferred_interrupt_count = 0;
+
+    for (int i = 0; i < 256; i++) {
+        vm->pending_vectors[i] = 0;
+    }
 }
 
 static noreturn void vm_panic(vm_t *vm, err_t err) {
@@ -1028,12 +1033,36 @@ static void vm_execute(vm_t *vm) {
             if (vm->flag_swap_sp) {
                 vm->pointer_stack = vm_pop32(vm);
             }
+            if (vm->flag_interrupt && vm->deferred_interrupt_count != 0) {
+                for (int i = 0; i < 256; i++) {
+                    if (vm->pending_vectors[i]) {
+                        vm->deferred_interrupt_count--;
+                        vm->pending_vectors[i] = 0;
+                        vm->pointer_instr = vm->pointer_instr_mut;
+                        fox32_raise(vm, i);
+                        vm->pointer_instr_mut = vm->pointer_instr;
+                        break;
+                    }
+                }
+            }
             break;
         };
 
         case OP(SZ_WORD, OP_ISE): {
             VM_PRELUDE_0();
             vm->flag_interrupt = true;
+            if (vm->deferred_interrupt_count != 0) {
+                for (int i = 0; i < 256; i++) {
+                    if (vm->pending_vectors[i]) {
+                        vm->deferred_interrupt_count--;
+                        vm->pending_vectors[i] = 0;
+                        vm->pointer_instr = vm->pointer_instr_mut;
+                        fox32_raise(vm, i);
+                        vm->pointer_instr_mut = vm->pointer_instr;
+                        break;
+                    }
+                }
+            }
             break;
         };
         case OP(SZ_WORD, OP_ICL): {
@@ -1219,6 +1248,11 @@ static err_t vm_resume(vm_t *vm, uint32_t count, uint32_t *executed) {
 
 static fox32_err_t vm_raise(vm_t *vm, uint16_t vector) {
     if (!vm->flag_interrupt && vector < 256) {
+        if (vm->pending_vectors[vector] == 0) {
+            vm->pending_vectors[vector] = 1;
+            vm->deferred_interrupt_count++;
+        }
+
         return FOX32_ERR_NOINTERRUPTS;
     }
     if (setjmp(vm->panic_jmp) != 0) {

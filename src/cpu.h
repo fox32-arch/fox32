@@ -72,6 +72,9 @@ typedef struct {
     fox32_io_read_t *io_read;
     fox32_io_write_t *io_write;
 
+    uint16_t deferred_interrupt_count;
+
+    uint8_t pending_vectors[256];
     uint8_t memory_ram[FOX32_MEMORY_RAM];
     uint8_t memory_rom[FOX32_MEMORY_ROM];
 } fox32_vm_t;
