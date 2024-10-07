@@ -198,15 +198,29 @@ void main_loop(void) {
 }
 
 void load_rom(const char *filename) {
-    FILE *rom;
-    rom = fopen(filename, "r");
+    FILE *rom = fopen(filename, "r");
 
     if (!rom) {
-        fprintf(stderr, "couldn't open ROM file %s\n", filename);
-        return;
+        fprintf(stderr, "couldn't find ROM file %s\n", filename);
+        exit(1);
+    }
+    printf("using %s as boot ROM\n", filename);
+
+    if (fread(&vm.memory_rom, sizeof(fox32rom), 1, rom) != 1) {
+        fprintf(stderr, "error reading ROM file %s\n", filename);
+        if (feof(rom)) {
+            fprintf(stderr, "ROM file too small, must be %lu bytes\n", sizeof(fox32rom));
+        }
+        fclose(rom);
+        exit(1);
     }
 
-    printf("using %s as boot ROM\n", filename);
-    fread(&vm.memory_rom, sizeof(fox32rom), 1, rom);
+    if (fgetc(rom) != EOF) {
+        fprintf(stderr, "error reading ROM file %s\n", filename);
+        fprintf(stderr, "ROM file too large, must be %lu bytes\n", sizeof(fox32rom));
+        fclose(rom);
+        exit(1);
+    }
+
     fclose(rom);
 }
