@@ -29,13 +29,21 @@ void ScreenInit() {
         SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
         (int)(WindowWidth * SCREEN_ZOOM),
         (int)(WindowHeight * SCREEN_ZOOM),
-        SDL_WINDOW_HIDDEN
+        SDL_WINDOW_HIDDEN | SDL_WINDOW_ALLOW_HIGHDPI
     );
 
     if (!ScreenWindow) {
         fprintf(stderr, "failed to create window\n");
         exit(1);
     }
+
+    SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitor");
+    SDL_SetHint(SDL_HINT_WINDOWS_DPI_SCALING, "1");
+
+    // set scale filtering mode
+    char filtering[2];
+    sprintf(filtering, "%d", MainScreen.ScaleFiltering);
+    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, filtering); // 0: point, 1 = linear
 
     ScreenRenderer = SDL_CreateRenderer(ScreenWindow, -1, 0);
 
@@ -164,6 +172,7 @@ struct SDL_Texture *ScreenGetTexture(struct Screen *screen) {
 
 void ScreenCreate(
     int w, int h,
+    int filtering,
     ScreenDrawF draw,
     ScreenKeyPressedF keypressed,
     ScreenKeyReleasedF keyreleased,
@@ -181,7 +190,7 @@ void ScreenCreate(
 
     MainScreen.Width = w;
     MainScreen.Height = h;
-
+    MainScreen.ScaleFiltering = filtering;
     MainScreen.Draw = draw;
     MainScreen.KeyPressed = keypressed;
     MainScreen.KeyReleased = keyreleased;

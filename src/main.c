@@ -54,17 +54,21 @@ int main(int argc, char *argv[]) {
     memcpy(vm.memory_rom, fox32rom, sizeof(fox32rom));
 
     size_t disk_id = 0;
+    int filtering_mode = 0;
 #ifndef __EMSCRIPTEN__
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0) {
             fprintf(stderr,
                     "Usage: %s [OPTIONS]\n\n"
                     "Options:\n"
-                    "  --help         Print this message\n"
-                    "  --disk DISK    Specify a disk image to use\n"
-                    "  --rom ROM      Specify a ROM image to use\n"
-                    "  --debug        Enable debug output\n"
-                    "  --headless     Headless mode: don't open a window\n"
+                    "  --help             Print this message\n"
+                    "  --disk DISK        Specify a disk image to use\n"
+                    "  --rom ROM          Specify a ROM image to use\n"
+                    "  --debug            Enable debug output\n"
+                    "  --headless         Headless mode: don't open a window\n"
+                    "  --filtering MODE   Set scale filtering mode for high DPI displays\n"
+                    "                       0 = nearest pixel (default)\n"
+                    "                       1 = linear filtering\n"
                    , argv[0]);
             return 0;
         } else if (strcmp(argv[i], "--disk") == 0) {
@@ -87,6 +91,21 @@ int main(int argc, char *argv[]) {
             vm.debug = true;
         } else if (strcmp(argv[i], "--headless") == 0) {
             vm.headless = true;
+        } else if (strcmp(argv[i], "--filtering") == 0) {
+            if (i + 1 < argc) {
+                if (strcmp(argv[i + 1], "0") == 0) {
+                    filtering_mode = 0; // nearest pixel filtering
+                } else if (strcmp(argv[i + 1], "1") == 0) {
+                    filtering_mode = 1; // linear filtering
+                } else {
+                    fprintf(stderr, "incorrect scale filtering mode specified\n");
+                    return 1;
+                }
+                i++;
+            } else {
+                fprintf(stderr, "no scale filtering mode specified\n");
+                return 1;
+            }
         } else {
             fprintf(stderr, "unrecognized option %s\n", argv[i]);
             return 1;
@@ -106,6 +125,7 @@ int main(int argc, char *argv[]) {
 
         ScreenCreate(
             FRAMEBUFFER_WIDTH, FRAMEBUFFER_HEIGHT,
+            filtering_mode,
             draw_framebuffer,
             key_pressed,
             key_released,
