@@ -34,21 +34,14 @@ If the instruction doesn't allow variable sizes or a size was not specified, set
 | 0b101 | IFGT   | greater than                                  |
 | 0b110 | IFLTEQ | less than or equal to                         |
 
-# Destination table
-|      |                     |
-| :--: | ------------------- |
-| 0b00 | register            |
-| 0b01 | register (pointer)  |
-| 0b10 | (invalid)           |
-| 0b11 | immediate (pointer) |
-
-# Source table
+# Source/Destination table
 |      |                     |
 | :--: | ------------------- |
 | 0b00 | register            |
 | 0b01 | register (pointer)  |
 | 0b10 | immediate           |
 | 0b11 | immediate (pointer) |
+Using an immediate (0b10) as the destination type is only allowed in a few cases, such as with the `OUT` instruction. Using it with instructions where it doesn't make sense (such as doing `mov 0, 1` for example) will throw an invalid opcode exception.
 
 # Register Pointer Offset
-The off field indicates that each operand of type 0b01 (register pointer) has an 8 bit immediate.  This immediate is added to the value of the register before derefencing.
+The off field indicates that each operand of type 0b01 (register pointer) has an 8-bit immediate following the operand.  This immediate is added to the value of the register before dereferencing.
