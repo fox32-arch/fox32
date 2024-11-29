@@ -118,9 +118,11 @@ TODO
   0x00  | year (e.g. 2023)
   0x01  | month (1-12)
   0x02  | day (1-31)
+  0x03  | hour (0-23)
   0x04  | minute (0-59)
   0x05  | second (0-59)
   0x06  | milliseconds since startup
+  0x07  | daylight savings time active (zero or non-zero)
 
 
 ## 0x80001000: Disk

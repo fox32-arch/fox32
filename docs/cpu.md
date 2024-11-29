@@ -42,7 +42,7 @@ There are two kinds of external bus that the fox32 CPU can address:
 ## Instruction encoding
 
 All instructions start with a 16-bit control word, which is optionally followed
-by a source operand, or by source and target operands, depending on the opcode.
+by a source{,+offset} operand, or by source{,+offset} and target{,+offset} operands, depending on the opcode.
 
 
 | bits   | name   | description
@@ -50,7 +50,7 @@ by a source operand, or by source and target operands, depending on the opcode.
 |  1:0   | source | source operand type
 |  3:2   | target | target operand type
 |  6:4   | cond   | condition code
-|   7    | ---    | reserved, must be zero
+|   7    | off    | set if 8-bit unsigned offset follows register pointer operand
 | 13:8   | opcode | operation code/type, e.g. `mov` or `add`
 | 15:14  | size   | operation size, e.g. 32 bits
 
@@ -238,7 +238,7 @@ The address of the page directory can be set using the `tlb` instruction.
 
 Page directories and page tables are arrays of 1024 elements of the following format:
 
-| bits  | bit mask  ts  | purpose
+| bits  | bit mask      | purpose
 |-------|---------------|--------------------------------------------------
 | 31:12 | 0xfffff000    | address of page table or page
 | 1     | 0x00000002    | page is writable
