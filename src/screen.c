@@ -9,7 +9,9 @@
 
 #include "screen.h"
 
+#ifndef SCREEN_ZOOM
 #define SCREEN_ZOOM 1
+#endif
 
 struct Screen MainScreen;
 
