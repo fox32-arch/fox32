@@ -15,8 +15,8 @@ typedef void (*ScreenDropFileF)(char *filename);
 struct Screen {
     int Width;
     int Height;
+    int ScaleFiltering;
     SDL_Texture *Texture;
-
     ScreenDrawF Draw;
     ScreenKeyPressedF KeyPressed;
     ScreenKeyReleasedF KeyReleased;
@@ -36,6 +36,7 @@ struct SDL_Texture *ScreenGetTexture(struct Screen *screen);
 
 void ScreenCreate(
     int w, int h,
+    int filtering,
     ScreenDrawF draw,
     ScreenKeyPressedF keypressed,
     ScreenKeyReleasedF keyreleased,
