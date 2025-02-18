@@ -11,7 +11,7 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Download latest fox32rom artifact
         uses: dawidd6/action-download-artifact@v2
@@ -34,7 +34,7 @@ jobs:
         run: make
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: fox32
           path: fox32
