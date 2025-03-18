@@ -32,7 +32,8 @@ void set_and_flush_tlb(uint32_t virtual_address) {
     for (size_t i = 0; i < 64; i++) {
         mmu_tlb[i] = (mmu_page_t) {
             .physical_address = 0,
-            .virtual_page = 0,
+            // impossible to match with this entry because the low 12 bits are masked off first
+            .virtual_page = 0xFFFFFFFF,
             .present = false,
             .rw = false
         };
@@ -46,7 +47,8 @@ void flush_single_page(uint32_t virtual_address) {
     for (size_t i = 0; i < 64; i++) {
         if (mmu_tlb[i].virtual_page == virtual_page) {
             mmu_tlb[i].physical_address = 0;
-            mmu_tlb[i].virtual_page = 0;
+            // impossible to match with this entry because the low 12 bits are masked off first
+            mmu_tlb[i].virtual_page = 0xFFFFFFFF;
             mmu_tlb[i].present = false;
             mmu_tlb[i].rw = false;
             //printf("flushed\n");
