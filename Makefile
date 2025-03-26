@@ -5,10 +5,16 @@ SDL2_CONFIG = sdl2-config
 CFLAGS += -g -Ofast -std=c99 -Wall -Wextra `$(SDL2_CONFIG) --cflags`
 LDFLAGS += `$(SDL2_CONFIG) --libs`
 else
+ifeq ($(TARGET),aarch64-darwin)
+SDL2_CONFIG = sdl2-config
+CFLAGS += -g -Ofast -std=c99 -Wall -Wextra -I`$(SDL2_CONFIG) --prefix`/include -D_THREAD_SAFE
+LDFLAGS += `$(SDL2_CONFIG) --libs`
+else
 ifeq ($(TARGET),mingw)
 CC = x86_64-w64-mingw32-gcc
-CFLAGS += -g -Ofast -std=c99 -Wall -Wextra -DWINDOWS
-LDFLAGS += -lmingw32 -lSDL2main -lSDL2
+SDL2_CONFIG = /usr/local/x86_64-w64-mingw32/bin/sdl2-config
+CFLAGS += -g -Ofast -std=c99 -Wall -Wextra -DWINDOWS -I/usr/local/x86_64-w64-mingw32/include -Dmain=SDL_main
+LDFLAGS += -lmingw32 -lSDL2main -lSDL2 -L/usr/local/x86_64-w64-mingw32/lib -lmingw32 -lSDL2main -lSDL2 -mwindows
 TARGET_FILE_EXTENSION = .exe
 else
 ifeq ($(TARGET),wasm)
@@ -19,6 +25,7 @@ TARGET_EXTRADEPS = fox32os.img
 TARGET_FILE_EXTENSION = .html
 else
 $(error unknown TARGET)
+endif
 endif
 endif
 endif

@@ -58,18 +58,20 @@ int main(int argc, char *argv[]) {
 #ifndef __EMSCRIPTEN__
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0) {
-            fprintf(stderr,
-                    "Usage: %s [OPTIONS]\n\n"
-                    "Options:\n"
-                    "  --help             Print this message\n"
-                    "  --disk DISK        Specify a disk image to use\n"
-                    "  --rom ROM          Specify a ROM image to use\n"
-                    "  --debug            Enable debug output\n"
-                    "  --headless         Headless mode: don't open a window\n"
-                    "  --filtering MODE   Set scale filtering mode for high DPI displays\n"
-                    "                       0 = nearest pixel (default)\n"
-                    "                       1 = linear filtering\n"
-                   , argv[0]);
+            fprintf(
+                stderr,
+                "Usage: %s [OPTIONS]\n\n"
+                "Options:\n"
+                "  --help             Print this message\n"
+                "  --disk DISK        Specify a disk image to use\n"
+                "  --rom ROM          Specify a ROM image to use\n"
+                "  --debug            Enable debug output\n"
+                "  --headless         Headless mode: don't open a window\n"
+                "  --filtering MODE   Set scale filtering mode for high DPI displays\n"
+                "                       0 = nearest pixel (default)\n"
+                "                       1 = linear filtering\n",
+                argv[0]
+            );
             return 0;
         } else if (strcmp(argv[i], "--disk") == 0) {
             if (i + 1 < argc) {
@@ -84,7 +86,7 @@ int main(int argc, char *argv[]) {
                 load_rom(argv[i + 1]);
                 i++;
             } else {
-                fprintf(stderr, "no rom image specified\n");
+                fprintf(stderr, "no ROM image specified\n");
                 return 1;
             }
         } else if (strcmp(argv[i], "--debug") == 0) {
