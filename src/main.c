@@ -25,7 +25,7 @@
 
 #include "log.h"
 
-#include "../fox32rom.h"
+#include <fox32rom.h>
 
 #ifdef __EMSCRIPTEN__
 #define FPS 120
