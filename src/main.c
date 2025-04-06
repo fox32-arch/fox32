@@ -22,7 +22,7 @@
 #include "screen.h"
 #include "serial.h"
 
-#include "../fox32rom.h"
+#include <fox32rom.h>
 
 #define FPS 60
 #define TPF 1
