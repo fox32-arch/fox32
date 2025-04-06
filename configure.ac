@@ -1,9 +1,9 @@
 # setup project
-AC_INIT([fox32], [0.7.1], [https://github.com/fox32-arch])
+AC_INIT([fox32], [m4_esyscmd([build-aux/git-version-gen .tarball-version])], [https://github.com/fox32-arch])
 
 # configure autotools
 AC_CONFIG_AUX_DIR([build-aux])
-AM_INIT_AUTOMAKE([foreign -Wall -Werror])
+AM_INIT_AUTOMAKE([tar-ustar dist-zip foreign -Wall -Werror])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile src/Makefile])
 
