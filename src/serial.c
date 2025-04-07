@@ -1,5 +1,5 @@
 #include <stdio.h>
-#ifndef WINDOWS
+#ifdef ENABLE_SERIAL
 #include <sys/select.h>
 #include <unistd.h>
 #include <termios.h>

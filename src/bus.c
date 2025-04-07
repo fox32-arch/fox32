@@ -30,7 +30,7 @@ extern mouse_t mouse;
 int bus_io_read(void *user, uint32_t *value, uint32_t port) {
     (void) user;
     switch (port) {
-#ifndef WINDOWS
+#ifdef ENABLE_SERIAL
         case 0x00000000: { // serial port
             *value = serial_get();
             break;

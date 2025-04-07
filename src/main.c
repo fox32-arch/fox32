@@ -141,7 +141,7 @@ int main(int argc, char *argv[]) {
         ScreenDraw();
     }
 
-#ifndef WINDOWS
+#ifdef ENABLE_SERIAL
     serial_init();
 #endif
 
