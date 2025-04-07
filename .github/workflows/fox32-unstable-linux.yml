@@ -24,14 +24,17 @@ jobs:
         run: |
           mv fox32.rom/ download/
           cp download/fox32.rom ./fox32.rom
+          cp download/fox32rom.h src/fox32rom.h
 
-      - name: Install libsdl2-dev and vim
+      - name: Install libsdl2-dev
         run: |
           sudo apt update
-          sudo apt install -y libsdl2-dev vim
+          sudo apt install -y libsdl2-dev
 
       - name: Build
-        run: make
+        run: |
+          ./configure
+          make
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
