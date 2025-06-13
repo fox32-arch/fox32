@@ -102,8 +102,8 @@ currently available.
 
  bits   | description
 --------|------------------
-  8     | 0=pressed, 1=released
-  7:0   | PC-compatible keyboard scancode
+  7     | 0=pressed, 1=released
+  6:0   | PC-compatible keyboard scancode
 
 
 ## 0x80000600: Audio
