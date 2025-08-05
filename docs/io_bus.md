@@ -14,7 +14,7 @@ higher bits indicate the function to be performed.
 | 0x80000000 | 0x8000031f | display
 | 0x80000400 | 0x80000401 | mouse
 | 0x80000500 | 0x80000500 | keyboard
-| 0x80000600 | 0x80000600 | audio
+| 0x80000600 | 0x800006ff | audio
 | 0x80000700 | 0x80000706 | RTC and uptime
 | 0x80001000 | 0x80005003 | disk
 | 0x80010000 | 0x80010000 | power controller
@@ -106,10 +106,61 @@ currently available.
   6:0   | PC-compatible keyboard scancode
 
 
-## 0x80000600: Audio
+## 0x80000600-0x80000680: Audio
 
-TODO
+The audio controller manages 4 PCM audio channels and sums them together
+to get the final audio output. The controller has a maximum output rate
+of 48kHz and can handle 8-bit/16-bit PCM samples at any physical address in memory.
 
+All of the channel registers for the 4 channels are accessed at $00-$3f. The upper
+nibble determines the channel number, while the lower number determines the register.
+
+The range between $40-$7f is unused, and any reads here will return a 0. The remaining
+range from $81-$ff is also unused and reserved for future expansions.
+
+ offset (X = 0...3) | description
+--------------------|------------------
+  0xX0              | audio channel X sample start
+  0xX1              | audio channel X sample start
+  0xX2              | audio channel X loop point start
+  0xX3              | audio channel X loop point end
+  0xX4              | audio channel X rate
+  0xX5              | audio channel X control
+  0x80              | audio controller sample base
+
+### 0xX0: Sample position (Read)
+Read this register to get the current position in the sample that is playing in the audio channel.
+
+### 0xX1: Sample data (Read)
+Read this register to get the current output sample of the audio channel.
+
+### 0xX0, 0xX1: Sample start and end (Write)
+Write a number to these registers to specify the start and end of the sample relative to
+the controller's sample base.
+
+### 0xX2, 0xX3: Loop point start and end (Write-only)
+Write a number to these registers to specify the start and end of the sample relative to
+the controller's sample base. Reading these registers will return a 0.
+
+### 0xX4: Channel accumulator (Read)
+Read this register to get the current value of the channel phase accumulator.
+
+### 0xX4: Channel rate (Write)
+Write a number here to specify the rate at which samples are fetched.
+The theoretical range is from 0 to 4294967295 (2^32 - 1), however the recommended minimum is
+65536, since higher rates may result in undefined behaviour.
+
+A desired rate R can be calculated according to the formula: $\frac{R}{48000}\times2^{16}$. To play a sample at a sample rate of 48kHz, calculate the rate: $\frac{48000}{48000}\times2^{16} = 65536$ and write the resulting rate to this register.
+
+### 0xX5: Audio channel control (Read, Write)
+
+ bits   | description
+--------|------------------
+  15:10 | not used
+  9     | 0=8-bit PCM, 1=16-bit PCM (write-only)
+  8     | enable
+  7     | loop
+  6:0   | volume (0-127)
 
 ## 0x80000700: Real-Time Clock (RTC) and Uptime
 

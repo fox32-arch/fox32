@@ -39,7 +39,8 @@ CFILES = src/main.c \
 		src/mmu.c \
 		src/mouse.c \
 		src/screen.c \
-		src/serial.c
+		src/serial.c \
+		src/sound.c
 
 OBJS = $(addsuffix .o, $(basename $(CFILES)))
 
