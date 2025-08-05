@@ -1,29 +1,34 @@
 #pragma once
 
+#define FOX32_AUDIO_CHANNELS 8
+
 typedef struct {
-	uint32_t start;
-	uint32_t end;
-	uint32_t loop_start;
-	uint32_t loop_end;
-	bool loop;
-	bool enable;
-	bool last_enable;
-	
-	uint8_t volume;
-	
-	uint32_t accumulator;
-	uint32_t frequency;
-	
-	bool bits16;
-	
-	uint32_t position;
-	int16_t data;
+    uint32_t start;
+    uint32_t end;
+    uint32_t loop_start;
+    uint32_t loop_end;
+    bool loop;
+    bool enable;
+    bool last_enable;
+    
+    uint8_t volume;
+    uint8_t left_volume;
+    uint8_t right_volume;
+    
+    uint32_t accumulator;
+    uint32_t frequency;
+    
+    bool bits16;
+    
+    uint32_t position;
+    int16_t data;
 } sound_channel_t;
 
 typedef struct {
-	sound_channel_t channel[4];
-	uint32_t base;
-	int32_t out;
+    sound_channel_t channel[FOX32_AUDIO_CHANNELS];
+    uint32_t base;
+    int32_t out_left;
+    int32_t out_right;
 } sound_t;
 
 void sound_init();
@@ -38,11 +43,14 @@ writing:
 0x800006x3 - AUDxLOOPEND (32-bit)
 0x800006x4 - AUDxRATE (32-bit)
 0x800006x5 - AUDxCONTROL
-	bit 15:9 - 0
-	bit 9 - 8/16-bit PCM select (0 = 8-bit, 1 = 16-bit)
-	bit 8 - enable (1=sound on, 0=sound off)
-	bit 7 - loop
-	bit 6:0 - volume
+    bit 15:10 - 0
+    bit 9 - 8/16-bit PCM select (0 = 8-bit, 1 = 16-bit)
+    bit 8 - enable (1=sound on, 0=sound off)
+    bit 7 - loop
+    bit 6:0 - volume
+0x800006x6 - AUDxPAN
+    bit 15:8 - left volume 0-255
+    bit 7:0 - right volume 0-255
 0x80000680 - AUDBASE
 
 reading:
@@ -52,10 +60,10 @@ reading:
 0x800006x3 - null
 0x800006x4 - AUDxRATE (32-bit)
 0x800006x5 - AUDxCONTROL
-	bit 15:10 - 0
-	bit 9 - 8/16-bit PCM select (0 = 8-bit, 1 = 16-bit)
-	bit 8 - enable (1=sound on, 0=sound off)
-	bit 7 - loop
-	bit 6:0 - volume
+    bit 15:10 - 0
+    bit 9 - 8/16-bit PCM select (0 = 8-bit, 1 = 16-bit)
+    bit 8 - enable (1=sound on, 0=sound off)
+    bit 7 - loop
+    bit 6:0 - volume
 0x80000680 - AUDBASE
 */

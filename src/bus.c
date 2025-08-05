@@ -106,10 +106,6 @@ int bus_io_read(void *user, uint32_t *value, uint32_t port) {
                     *value = snd.base;
                     break;
                 }
-                default: {
-                    *value = 0;
-                    break;
-                }
             }
             switch (reg) {
                 case 0x0: {
@@ -129,11 +125,12 @@ int bus_io_read(void *user, uint32_t *value, uint32_t port) {
                 }
                 case 0x5: {
                     // AUDxCONTROL
-                    *value = snd.channel[channel].volume | (snd.channel[channel].loop << 7) | (snd.channel[channel].enable << 8);
+                    *value = snd.channel[channel].volume | (snd.channel[channel].loop << 7) | (snd.channel[channel].enable << 8) | (snd.channel[channel].bits16 << 9);
                     break;
                 }
-                default: {
-                    *value = 0;
+                case 0x6: {
+                    // AUDxPAN
+                    *value = snd.channel[channel].right_volume | (snd.channel[channel].left_volume << 8);
                     break;
                 }
             }
@@ -312,6 +309,12 @@ int bus_io_write(void *user, uint32_t value, uint32_t port) {
                     snd.channel[channel].loop = value & 0x00000080;
                     snd.channel[channel].enable = value & 0x00000100;
                     snd.channel[channel].bits16 = value & 0x00000200;
+                    break;
+                }
+                case 0x6: {
+                    // AUDxPAN
+                    snd.channel[channel].right_volume = value & 0x000000FF;
+                    snd.channel[channel].left_volume = (value & 0x0000FF00) >> 8;
                     break;
                 }
             }

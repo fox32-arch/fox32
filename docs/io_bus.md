@@ -108,17 +108,20 @@ currently available.
 
 ## 0x80000600-0x80000680: Audio
 
-The audio controller manages 4 PCM audio channels and sums them together
+The audio controller manages 8 PCM audio channels and sums them together
 to get the final audio output. The controller has a maximum output rate
 of 48kHz and can handle 8-bit/16-bit PCM samples at any physical address in memory.
 
-All of the channel registers for the 4 channels are accessed at $00-$3f. The upper
+All of the channel registers for the 8 channels are accessed at $00-$7F. The upper
 nibble determines the channel number, while the lower number determines the register.
 
-The range between $40-$7f is unused, and any reads here will return a 0. The remaining
-range from $81-$ff is also unused and reserved for future expansions.
+The range from $81-$FF is unused and reserved for future expansions.
 
- offset (X = 0...3) | description
+Each channel has 3 volume controls: the channel volume, the left volume and the right volume.
+The channel is scaled by the channel volume (0-127), then it is scaled according to the left
+and right volumes (both 0-255).
+
+ offset (X = 0...7) | description
 --------------------|------------------
   0xX0              | audio channel X sample start
   0xX1              | audio channel X sample end
@@ -126,13 +129,14 @@ range from $81-$ff is also unused and reserved for future expansions.
   0xX3              | audio channel X loop point end
   0xX4              | audio channel X rate
   0xX5              | audio channel X control
+  0xX6              | audio channel X panning
   0x80              | audio controller sample base
 
 ### 0xX0: Sample position (Read)
-Read this register to get the current position in the sample that is playing in the audio channel.
+Read this register to get the current position of the sample that is playing in the audio channel.
 
 ### 0xX1: Sample data (Read)
-Read this register to get the current output sample of the audio channel.
+Read this register to get the current output sample of the audio channel (16-bit half).
 
 ### 0xX0, 0xX1: Sample start and end (Write)
 Write a number to these registers to specify the start and end of the sample relative to
@@ -156,11 +160,18 @@ A desired rate R can be calculated according to the formula: $\frac{R}{48000}\ti
 
  bits   | description
 --------|------------------
-  15:10 | not used
-  9     | 0=8-bit PCM, 1=16-bit PCM (write-only)
+  31:10 | not used
+  9     | 0=8-bit PCM, 1=16-bit PCM
   8     | enable
   7     | loop
   6:0   | volume (0-127)
+
+### 0xX6: Audio panning control (Read, Write)
+
+ bits   | description
+--------|------------------
+  15:8  | left volume (0-255)
+  7:0   | right volume (0-255)
 
 ## 0x80000700: Real-Time Clock (RTC) and Uptime
 
