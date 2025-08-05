@@ -52,7 +52,7 @@ reading:
 0x800006x3 - null
 0x800006x4 - AUDxRATE (32-bit)
 0x800006x5 - AUDxCONTROL
-	bit 15:9 - 0
+	bit 15:10 - 0
 	bit 9 - 8/16-bit PCM select (0 = 8-bit, 1 = 16-bit)
 	bit 8 - enable (1=sound on, 0=sound off)
 	bit 7 - loop

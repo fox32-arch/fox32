@@ -121,7 +121,7 @@ range from $81-$ff is also unused and reserved for future expansions.
  offset (X = 0...3) | description
 --------------------|------------------
   0xX0              | audio channel X sample start
-  0xX1              | audio channel X sample start
+  0xX1              | audio channel X sample end
   0xX2              | audio channel X loop point start
   0xX3              | audio channel X loop point end
   0xX4              | audio channel X rate
@@ -147,10 +147,10 @@ Read this register to get the current value of the channel phase accumulator.
 
 ### 0xX4: Channel rate (Write)
 Write a number here to specify the rate at which samples are fetched.
-The theoretical range is from 0 to 4294967295 (2^32 - 1), however the recommended minimum is
+The theoretical range is from 0 to 4294967295 (2^32 - 1), however the recommended maximum is
 65536, since higher rates may result in undefined behaviour.
 
-A desired rate R can be calculated according to the formula: $\frac{R}{48000}\times2^{16}$. To play a sample at a sample rate of 48kHz, calculate the rate: $\frac{48000}{48000}\times2^{16} = 65536$ and write the resulting rate to this register.
+A desired rate R can be calculated according to the formula: $\frac{R}{48000}\times2^{16}$. To play a sample at a sample rate of 48kHz, calculate the rate: $\frac{48000}{48000}\times2^{16} = 65536$ and write the resulting rate of 65536 to this register.
 
 ### 0xX5: Audio channel control (Read, Write)
 
