@@ -1,6 +1,8 @@
 #pragma once
 
 #define FOX32_AUDIO_CHANNELS 8
+#define FOX32_AUDIO_BUFFER_SIZE 16384
+#define FOX32_AUDIO_BUFFER_IRQ 0xFE
 
 typedef struct {
     uint32_t start;
@@ -29,6 +31,12 @@ typedef struct {
     uint32_t base;
     int32_t out_left;
     int32_t out_right;
+	
+	bool inhibit;
+	uint32_t active_base;
+	uint32_t active_pos;
+	bool alternate;
+	bool refill_pending;
 } sound_t;
 
 void sound_init();
@@ -52,6 +60,16 @@ writing:
     bit 15:8 - left volume 0-255
     bit 7:0 - right volume 0-255
 0x80000680 - AUDBASE
+0x80000681 - AUDCTL
+	bit 0: disable audio controller
+when bit 0 of AUDCTL is 1, the channels are disabled, and the audio controller
+now expects an area of 32768 bytes for 2 buffers of 16384 bytes (16-bit PCM,
+interleaved stereo). 
+in this mode, the audio controller employs double audio buffers. it reads from
+the active buffer, then when it is half-way read, an IRQ is raised in order to
+let the processor know it is time to fill the other buffer. after the controller
+is done reading that buffer, it then reads the second buffer, then raises an IRQ
+to refill the first buffer, and this alternates back and forth.
 
 reading:
 0x800006x0 - AUDxPOS (32-bit)

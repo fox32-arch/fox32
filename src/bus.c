@@ -276,6 +276,11 @@ int bus_io_write(void *user, uint32_t value, uint32_t port) {
                     snd.base = value;
                     break;
                 }
+				case 0x81: {
+                    // AUDCTL
+                    snd.inhibit = value & 0x01;
+                    break;
+                }
             }
             switch (reg) {
                 case 0x0: {
