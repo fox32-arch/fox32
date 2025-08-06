@@ -1,7 +1,7 @@
 #pragma once
 
 #define FOX32_AUDIO_CHANNELS 8
-#define FOX32_AUDIO_BUFFER_SIZE 16384
+#define FOX32_AUDIO_BUFFER_SIZE 32768
 #define FOX32_AUDIO_BUFFER_IRQ 0xFE
 
 typedef struct {
@@ -31,12 +31,13 @@ typedef struct {
     uint32_t base;
     int32_t out_left;
     int32_t out_right;
-	
-	bool inhibit;
-	uint32_t active_base;
-	uint32_t active_pos;
-	bool alternate;
-	bool refill_pending;
+    
+    bool buffer;
+    bool refill_pending;
+    uint8_t buffer_mode;
+    uint8_t buffer_phase;
+    uint8_t buffer_rate;
+    uint32_t buffer_pos;
 } sound_t;
 
 void sound_init();
@@ -51,7 +52,7 @@ writing:
 0x800006x3 - AUDxLOOPEND (32-bit)
 0x800006x4 - AUDxRATE (32-bit)
 0x800006x5 - AUDxCONTROL
-    bit 15:10 - 0
+    bit 31:10 - 0
     bit 9 - 8/16-bit PCM select (0 = 8-bit, 1 = 16-bit)
     bit 8 - enable (1=sound on, 0=sound off)
     bit 7 - loop
@@ -61,15 +62,20 @@ writing:
     bit 7:0 - right volume 0-255
 0x80000680 - AUDBASE
 0x80000681 - AUDCTL
-	bit 0: disable audio controller
+    bit 15:8 - buffer rate
+    bit 5:4 - buffer format
+        00: mono 8-bit
+        01: mono 16-bit
+        10: stereo 8-bit
+        11: stereo 16-bit
+    bit 1 - sound refill pending flag
+        write 0 here to acknowledge a refill IRQ
+    bit 0 - buffer mode
 when bit 0 of AUDCTL is 1, the channels are disabled, and the audio controller
-now expects an area of 32768 bytes for 2 buffers of 16384 bytes (16-bit PCM,
-interleaved stereo). 
-in this mode, the audio controller employs double audio buffers. it reads from
-the active buffer, then when it is half-way read, an IRQ is raised in order to
-let the processor know it is time to fill the other buffer. after the controller
-is done reading that buffer, it then reads the second buffer, then raises an IRQ
-to refill the first buffer, and this alternates back and forth.
+now expects an audio buffer of 32768 bytes at the address specified in AUDBASE.
+when the buffer position is half-way through the length (position >= 16384),
+an IRQ is raised and the sound refill pending flag is set. the flag must then be
+cleared in order for another IRQ to occur.
 
 reading:
 0x800006x0 - AUDxPOS (32-bit)
@@ -78,10 +84,18 @@ reading:
 0x800006x3 - null
 0x800006x4 - AUDxRATE (32-bit)
 0x800006x5 - AUDxCONTROL
-    bit 15:10 - 0
+    bit 31:10 - 0
     bit 9 - 8/16-bit PCM select (0 = 8-bit, 1 = 16-bit)
     bit 8 - enable (1=sound on, 0=sound off)
     bit 7 - loop
     bit 6:0 - volume
 0x80000680 - AUDBASE
+0x80000681 - AUDCTL
+    bit 31:16 - 0
+    bit 15:8 - buffer rate
+    bit 5:4 - buffer format
+    bit 1 - sound refill pending flag
+        a value of 1 here indicates that the buffer refill IRQ
+        has not yet been acknowledged
+    bit 0 - buffer mode
 */

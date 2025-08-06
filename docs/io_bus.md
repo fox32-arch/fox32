@@ -106,20 +106,12 @@ currently available.
   6:0   | PC-compatible keyboard scancode
 
 
-## 0x80000600-0x80000680: Audio
-
-The audio controller manages 8 PCM audio channels and sums them together
-to get the final audio output. The controller has a maximum output rate
-of 48kHz and can handle 8-bit/16-bit PCM samples at any physical address in memory.
+## 0x80000600-0x80000681: Audio
 
 All of the channel registers for the 8 channels are accessed at $00-$7F. The upper
 nibble determines the channel number, while the lower number determines the register.
 
-The range from $81-$FF is unused and reserved for future expansions.
-
-Each channel has 3 volume controls: the channel volume, the left volume and the right volume.
-The channel is scaled by the channel volume (0-127), then it is scaled according to the left
-and right volumes (both 0-255).
+The range from $82-$FF is unused and reserved for future expansions.
 
  offset (X = 0...7) | description
 --------------------|------------------
@@ -131,47 +123,9 @@ and right volumes (both 0-255).
   0xX5              | audio channel X control
   0xX6              | audio channel X panning
   0x80              | audio controller sample base
+  0x81              | audio controller state
 
-### 0xX0: Sample position (Read)
-Read this register to get the current position of the sample that is playing in the audio channel.
-
-### 0xX1: Sample data (Read)
-Read this register to get the current output sample of the audio channel (16-bit half).
-
-### 0xX0, 0xX1: Sample start and end (Write)
-Write a number to these registers to specify the start and end of the sample relative to
-the controller's sample base.
-
-### 0xX2, 0xX3: Loop point start and end (Write-only)
-Write a number to these registers to specify the start and end of the sample relative to
-the controller's sample base. Reading these registers will return a 0.
-
-### 0xX4: Channel accumulator (Read)
-Read this register to get the current value of the channel phase accumulator.
-
-### 0xX4: Channel rate (Write)
-Write a number here to specify the rate at which samples are fetched.
-The theoretical range is from 0 to 4294967295 (2^32 - 1), however the recommended maximum is
-65536, since higher rates may result in undefined behaviour.
-
-A desired rate R can be calculated according to the formula: $\frac{R}{48000}\times2^{16}$. To play a sample at a sample rate of 48kHz, calculate the rate: $\frac{48000}{48000}\times2^{16} = 65536$ and write the resulting rate of 65536 to this register.
-
-### 0xX5: Audio channel control (Read, Write)
-
- bits   | description
---------|------------------
-  31:10 | not used
-  9     | 0=8-bit PCM, 1=16-bit PCM
-  8     | enable
-  7     | loop
-  6:0   | volume (0-127)
-
-### 0xX6: Audio panning control (Read, Write)
-
- bits   | description
---------|------------------
-  15:8  | left volume (0-255)
-  7:0   | right volume (0-255)
+For more details, see [audio.md](audio.md).
 
 ## 0x80000700: Real-Time Clock (RTC) and Uptime
 

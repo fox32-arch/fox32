@@ -96,7 +96,7 @@ int bus_io_read(void *user, uint32_t *value, uint32_t port) {
 
             break;
         }
-        case 0x80000600 ... 0x80000680: { // audio port
+        case 0x80000600 ... 0x80000681: { // audio port
             size_t id = port & 0xFF;
             uint8_t channel = (id & 0x30) >> 4;
             uint8_t reg = (id & 0x0F);
@@ -106,6 +106,15 @@ int bus_io_read(void *user, uint32_t *value, uint32_t port) {
                     *value = snd.base;
                     break;
                 }
+				case 0x81: {
+                    // AUDCTL
+                    snd.buffer = value & 0x01;
+					snd.refill_pending = value & 0x02;
+					snd.buffer_mode = (value & 0x30) >> 4;
+					snd.buffer_rate = (value & 0xff00) >> 8;
+					*value = snd.buffer | (snd.refill_pending << 1) | (snd.buffer_mode << 4) | (snd.buffer_rate << 8);
+                    break;
+				}
             }
             switch (reg) {
                 case 0x0: {
@@ -266,19 +275,24 @@ int bus_io_write(void *user, uint32_t value, uint32_t port) {
             break;
         };
 
-        case 0x80000600 ... 0x80000680: { // audio port
+        case 0x80000600 ... 0x80000681: { // audio port
             size_t id = port & 0xFF;
             uint8_t channel = (id & 0x30) >> 4;
             uint8_t reg = (id & 0x0F);
             switch (id) {
                 case 0x80: {
                     // AUDBASE
+					printf("AUDBASE: %08x\n", value);
                     snd.base = value;
                     break;
                 }
 				case 0x81: {
+                    printf("AUDCTL: %08x\n", value);
                     // AUDCTL
-                    snd.inhibit = value & 0x01;
+                    snd.buffer = value & 0x01;
+					snd.refill_pending = value & 0x02;
+					snd.buffer_mode = (value & 0x30) >> 4;
+					snd.buffer_rate = (value & 0xff00) >> 8;
                     break;
                 }
             }

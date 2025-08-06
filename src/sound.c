@@ -15,31 +15,56 @@ sound_t snd;
 extern fox32_vm_t vm;
 
 void sound_step() {
-	/* manual mixing */
-	if (snd.inhibit) {
-		if (snd.active_pos < FOX32_AUDIO_BUFFER_SIZE) {
-			uint32_t abs_left = snd.active_base + snd.active_pos;
-			uint32_t abs_right = abs_left + 2;
-			snd.out_left = vm.memory_ram[abs_left] | (vm.memory_ram[abs_left+1] << 8);
-			snd.out_right = vm.memory_ram[abs_right] | (vm.memory_ram[abs_right+1] << 8);
-			snd.active_pos += 4;
-			if (snd.active_pos >= (FOX32_AUDIO_BUFFER_SIZE/2) && !snd.refill_pending) {
-				snd.refill_pending = true;
-			}
-		} else {
-			snd.alternate = !snd.alternate;
-			snd.active_base = snd.base + (snd.alternate * FOX32_AUDIO_BUFFER_SIZE);
-			snd.active_pos = 0;
-			snd.refill_pending = false;
-			snd.out_left = 0;
-			snd.out_right = 0;
-		}
-		return;
-	}
-	
-	/* auto-channels */
-	snd.out_left = 0;
-	snd.out_right = 0;
+    /* manual mixing */
+    if (snd.buffer) {
+        uint8_t old_phase = snd.buffer_phase;
+        snd.buffer_phase += snd.buffer_rate;
+        if ((old_phase & 0x80) != (snd.buffer_phase & 0x80)) {
+            uint32_t abs = snd.base + snd.buffer_pos;
+            switch (snd.buffer_mode & 3) {
+                case 0: {
+                    /* mono 8-bit */
+                    snd.out_left = (int16_t)vm.memory_ram[abs] << 8;
+                    snd.out_right = snd.out_left;
+                    snd.buffer_pos += 1;
+                    break;
+                }
+                case 1: {
+                    /* mono 16-bit */
+                    snd.out_left = vm.memory_ram[abs] | (vm.memory_ram[abs+1] << 8);
+                    snd.out_right = snd.out_left;
+                    snd.buffer_pos += 2;
+                    break;
+                }
+                case 2: {
+                    /* stereo 8-bit */
+                    snd.out_left = (int16_t)vm.memory_ram[abs] << 8;
+                    snd.out_right = (int16_t)vm.memory_ram[abs+1] << 8;
+                    snd.buffer_pos += 2;
+                    break;
+                }
+                case 3: {
+                    /* stereo 16-bit */
+                    snd.out_left = vm.memory_ram[abs] | (vm.memory_ram[abs+1] << 8);
+                    snd.out_right = vm.memory_ram[abs+2] | (vm.memory_ram[abs+3] << 8);
+                    snd.buffer_pos += 4;
+                    break;
+                }
+            }
+        }
+        snd.buffer_pos = snd.buffer_pos % FOX32_AUDIO_BUFFER_SIZE;
+        if (snd.buffer_pos >= (FOX32_AUDIO_BUFFER_SIZE/2)) {
+            if (!snd.refill_pending) {
+                fox32_raise(&vm, FOX32_AUDIO_BUFFER_IRQ);
+                snd.refill_pending = true;
+            }
+        }
+        return;
+    }
+    
+    /* auto-channels */
+    snd.out_left = 0;
+    snd.out_right = 0;
     for (int i=0; i<FOX32_AUDIO_CHANNELS; i++) {
         if (snd.channel[i].enable && !snd.channel[i].last_enable) {
             snd.channel[i].position = snd.channel[i].start;
@@ -101,11 +126,6 @@ void sound_callback(void* userdata, uint8_t* stream, int len) {
         if (right < -32768) right = -32768;
         buffer[(i*2)] = left;
         buffer[(i*2)+1] = right;
-		
-		if (snd.refill_pending) {
-			vm_raise(&vm, FOX32_AUDIO_BUFFER_IRQ);
-			snd.refill_pending = false;
-		}
     }
 }
 
