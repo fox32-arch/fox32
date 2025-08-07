@@ -53,6 +53,9 @@ void sound_step() {
             }
         }
         snd.buffer_pos = snd.buffer_pos % FOX32_AUDIO_BUFFER_SIZE;
+        if (snd.buffer_pos < (FOX32_AUDIO_BUFFER_SIZE/2)) {
+            snd.refill_pending = false;
+        }
         if (snd.buffer_pos >= (FOX32_AUDIO_BUFFER_SIZE/2)) {
             if (!snd.refill_pending) {
                 fox32_raise(&vm, FOX32_AUDIO_BUFFER_IRQ);

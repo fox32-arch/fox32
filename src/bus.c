@@ -284,7 +284,6 @@ int bus_io_write(void *user, uint32_t value, uint32_t port) {
                 case 0x81: {
                     // AUDCTL
                     snd.buffer = value & 0x01;
-                    snd.refill_pending = value & 0x02;
                     snd.buffer_mode = (value & 0x30) >> 4;
                     snd.buffer_rate = (value & 0xff00) >> 8;
                     break;
