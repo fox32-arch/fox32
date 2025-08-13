@@ -1,0 +1,8 @@
+- [ ] delete /.version
+- [ ] create commit "Prepare for release <version>"
+- [ ] create tag "Release <version>"
+- [ ] `autoreconf -i`
+- [ ] `./configure`
+- [ ] `make distcheck VERSION=<version>`
+- [ ] upload fox32-VERSION.tar.gz, fox32-VERSION.zip
+- [ ] create /.version with "<version>" contents

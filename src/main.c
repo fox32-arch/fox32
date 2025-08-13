@@ -22,7 +22,7 @@
 #include "screen.h"
 #include "serial.h"
 
-#include "../fox32rom.h"
+#include <fox32rom.h>
 
 #define FPS 60
 #define TPF 1
@@ -141,7 +141,7 @@ int main(int argc, char *argv[]) {
         ScreenDraw();
     }
 
-#ifndef WINDOWS
+#ifdef ENABLE_SERIAL
     serial_init();
 #endif
 

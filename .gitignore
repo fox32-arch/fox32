@@ -14,3 +14,11 @@ fox32.html
 fox32.wasm
 fox32.js
 fox32.data
+
+Makefile
+Makefile.in
+configure
+config.h.in
+aclocal.m4
+autom4te.cache
+build-aux
