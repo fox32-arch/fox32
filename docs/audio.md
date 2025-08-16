@@ -2,7 +2,7 @@
 
 The audio controller manages 8 PCM audio channels, summing them together
 to produce the final audio output. The controller has a maximum output rate
-of 48 kHz and can handle 8-bit or 16-bit PCM samples from any physical address in memory.
+of 48 kHz and can handle signed 8-bit or signed 16-bit PCM samples from any physical address in memory.
 
 Each channel has 3 volume controls: the channel volume, the left volume, and the right volume.
 The channel is scaled by the channel volume (0-127), and then by the left and right volumes (both 0-255).
@@ -31,6 +31,9 @@ Registers relating to the current status of the audio controller are located at 
   0x81  | audio controller state
 
 The range from 0x82-0xFF is unused and reserved for future expansions.
+
+The samples provided to the audio controller must be signed.
+Playing an unsigned sample will cause artifacts and distorted playback.
 
 ### 0xX0: Sample position (Read)
 Read this register to get the current position of the sample being played in the audio channel.
@@ -111,7 +114,7 @@ no samples are fetched until a non-zero rate is set.
   \>128    | undefined behaviour
 
 If bit 0 of this port is set, the channels are disabled and the controller expects
-a contiguous area of 32 kilobytes (32,768 bytes) for the audio buffer. This allows for
+a contiguous area of 32 kilobytes (32,768 bytes) relative to the sample base (specified at port 0x80) for the audio buffer. This allows for
 software-driven mixing and provides more control over the audio output.
 The format of this buffer is determined by bits 4 and 5:
   value    | description
