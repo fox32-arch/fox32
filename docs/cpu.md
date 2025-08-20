@@ -180,10 +180,7 @@ or 0x0 when no handler has been installed.
 | type      | vector   | description
 |-----------|----------|-------------------------------------------
 | interrupt | 0 - 0xF0 | free for software use
-| interrupt | 0xFB     | audio channel 3 refill
-| interrupt | 0xFC     | audio channel 2 refill
-| interrupt | 0xFD     | audio channel 1 refill
-| interrupt | 0xFE     | audio channel 0 refill
+| interrupt | 0xFE     | audio buffer low
 | interrupt | 0xFF     | display VSYNC
 | exception | 0x00     | divide by zero
 | exception | 0x01     | invalid opcode
