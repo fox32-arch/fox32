@@ -24,6 +24,7 @@ jobs:
         run: |
           mv fox32.rom/ download/
           cp download/fox32.rom ./fox32.rom
+          rm -rf fox32rom.h
 
       - name: Install libsdl2-dev and vim
         run: |
