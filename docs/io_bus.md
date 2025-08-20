@@ -14,7 +14,7 @@ higher bits indicate the function to be performed.
 | 0x80000000 | 0x8000031f | display
 | 0x80000400 | 0x80000401 | mouse
 | 0x80000500 | 0x80000500 | keyboard
-| 0x80000600 | 0x80000600 | audio
+| 0x80000600 | 0x800006ff | audio
 | 0x80000700 | 0x80000706 | RTC and uptime
 | 0x80001000 | 0x80005003 | disk
 | 0x80010000 | 0x80010000 | power controller
@@ -106,10 +106,26 @@ currently available.
   6:0   | PC-compatible keyboard scancode
 
 
-## 0x80000600: Audio
+## 0x80000600-0x80000681: Audio
 
-TODO
+All of the channel registers for the 8 channels are accessed at $00-$7F. The upper
+nibble determines the channel number, while the lower number determines the register.
 
+The range from $82-$FF is unused and reserved for future expansions.
+
+ offset (X = 0...7) | description
+--------------------|------------------
+  0xX0              | audio channel X sample start
+  0xX1              | audio channel X sample end
+  0xX2              | audio channel X loop point start
+  0xX3              | audio channel X loop point end
+  0xX4              | audio channel X rate
+  0xX5              | audio channel X control
+  0xX6              | audio channel X panning
+  0x80              | audio controller sample base
+  0x81              | audio controller state
+
+For more details, see [audio.md](audio.md).
 
 ## 0x80000700: Real-Time Clock (RTC) and Uptime
 

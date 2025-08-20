@@ -21,6 +21,7 @@
 #include "mouse.h"
 #include "screen.h"
 #include "serial.h"
+#include "sound.h"
 
 #include "../fox32rom.h"
 
@@ -32,6 +33,7 @@ fox32_vm_t vm;
 
 extern bool bus_requests_exit;
 extern disk_controller_t disk_controller;
+extern sound_t snd;
 
 uint32_t tick_start;
 uint32_t tick_end;
@@ -118,7 +120,7 @@ int main(int argc, char *argv[]) {
 #endif
 
     if (!vm.headless) {
-        if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
             fprintf(stderr, "unable to initialize SDL: %s", SDL_GetError());
             return 1;
         }
@@ -136,6 +138,7 @@ int main(int argc, char *argv[]) {
             mouse_moved,
             drop_file
         );
+        sound_init();
 
         ScreenInit();
         ScreenDraw();

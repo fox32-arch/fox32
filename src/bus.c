@@ -17,6 +17,7 @@
 #include "keyboard.h"
 #include "mouse.h"
 #include "serial.h"
+#include "sound.h"
 
 bool bus_requests_exit = false;
 
@@ -26,6 +27,7 @@ extern uint32_t rtc_uptime;
 extern fox32_vm_t vm;
 extern disk_controller_t disk_controller;
 extern mouse_t mouse;
+extern sound_t snd;
 
 int bus_io_read(void *user, uint32_t *value, uint32_t port) {
     (void) user;
@@ -36,7 +38,6 @@ int bus_io_read(void *user, uint32_t *value, uint32_t port) {
             break;
         };
 #endif
-
         case 0x80000000 ... 0x8000031F: { // overlay port
             uint8_t overlay_number = port & 0x000000FF;
             uint8_t setting = (port & 0x0000FF00) >> 8;
@@ -93,6 +94,51 @@ int bus_io_read(void *user, uint32_t *value, uint32_t port) {
         case 0x80000500: {
             *value = (uint32_t) key_take();
 
+            break;
+        }
+        case 0x80000600 ... 0x80000681: { // audio port
+            size_t id = port & 0xFF;
+            uint8_t channel = (id & 0x30) >> 4;
+            uint8_t reg = (id & 0x0F);
+            switch (id) {
+                case 0x80: {
+                    // AUDBASE
+                    *value = snd.base;
+                    break;
+                }
+                case 0x81: {
+                    // AUDCTL
+                    *value = snd.buffer | (snd.refill_pending << 1) | (snd.buffer_mode << 4) | (snd.buffer_rate << 8);
+                    break;
+                }
+            }
+            switch (reg) {
+                case 0x0: {
+                    // AUDxPOS
+                    *value = snd.channel[channel].position;
+                    break;
+                }
+                case 0x1: {
+                    // AUDxDAT
+                    *value = snd.channel[channel].data;
+                    break;
+                }
+                case 0x4: {
+                    // AUDxRATE
+                    *value = snd.channel[channel].accumulator;
+                    break;
+                }
+                case 0x5: {
+                    // AUDxCONTROL
+                    *value = snd.channel[channel].volume | (snd.channel[channel].loop << 7) | (snd.channel[channel].enable << 8) | (snd.channel[channel].bits16 << 9);
+                    break;
+                }
+                case 0x6: {
+                    // AUDxPAN
+                    *value = snd.channel[channel].right_volume | (snd.channel[channel].left_volume << 8);
+                    break;
+                }
+            }
             break;
         }
 
@@ -224,6 +270,68 @@ int bus_io_write(void *user, uint32_t value, uint32_t port) {
 
             break;
         };
+
+        case 0x80000600 ... 0x80000681: { // audio port
+            size_t id = port & 0xFF;
+            uint8_t channel = (id & 0x30) >> 4;
+            uint8_t reg = (id & 0x0F);
+            switch (id) {
+                case 0x80: {
+                    // AUDBASE
+                    snd.base = value;
+                    break;
+                }
+                case 0x81: {
+                    // AUDCTL
+                    snd.buffer = value & 0x01;
+                    snd.buffer_mode = (value & 0x30) >> 4;
+                    snd.buffer_rate = (value & 0xff00) >> 8;
+                    break;
+                }
+            }
+            switch (reg) {
+                case 0x0: {
+                    // AUDxSTART
+                    snd.channel[channel].start = value;
+                    break;
+                }
+                case 0x1: {
+                    // AUDxEND
+                    snd.channel[channel].end = value;
+                    break;
+                }
+                case 0x2: {
+                    // AUDxLOOPSTART
+                    snd.channel[channel].loop_start = value;
+                    break;
+                }
+                case 0x3: {
+                    // AUDxLOOPEND
+                    snd.channel[channel].loop_end = value;
+                    break;
+                }
+                case 0x4: {
+                    // AUDxRATE
+                    snd.channel[channel].frequency = value;
+                    break;
+                }
+                case 0x5: {
+                    // AUDxCONTROL
+                    snd.channel[channel].volume = value & 0x0000007F;
+                    snd.channel[channel].loop = value & 0x00000080;
+                    snd.channel[channel].enable = value & 0x00000100;
+                    snd.channel[channel].bits16 = value & 0x00000200;
+                    break;
+                }
+                case 0x6: {
+                    // AUDxPAN
+                    snd.channel[channel].right_volume = value & 0x000000FF;
+                    snd.channel[channel].left_volume = (value & 0x0000FF00) >> 8;
+                    break;
+                }
+            }
+            break;
+        }
 
         case 0x80001000 ... 0x80005003: { // disk controller port
             size_t id = port & 0xFF;
