@@ -54,7 +54,7 @@ int serial_get(void) {
 }
 
 #elif defined(WINDOWS)
-#include <Windows.h>
+#include <windows.h>
 
 static DWORD old_mode;
 static HANDLE hStdin;
@@ -77,7 +77,7 @@ int serial_get(void) {
     if (!is_terminal) {
         return 0;
     }
-    
+
     DWORD events;
     INPUT_RECORD buffer;
     DWORD eventsRead;
