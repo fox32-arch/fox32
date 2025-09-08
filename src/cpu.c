@@ -362,8 +362,17 @@ static void asm_disas_print(asm_instr_t instr, const asm_iinfo_t *iinfo, const u
 
 typedef fox32_vm_t vm_t;
 
-static void vm_init(vm_t *vm) {
+static void vm_init(vm_t *vm, uint32_t memory_size) {
     memset(vm, 0, sizeof(vm_t));
+    vm->memory_ram_size = memory_size;
+    vm->memory_ram = malloc(memory_size);
+    if (memory_size < FOX32_MEMORY_VRAM_START + FOX32_MEMORY_VRAM) {
+        vm->memory_vram = malloc(FOX32_MEMORY_VRAM);
+        vm->vram_allocated = true;
+    } else {
+        vm->memory_vram = &vm->memory_ram[0x02000000];
+        vm->vram_allocated = false;
+    }
     vm->pointer_instr = FOX32_POINTER_DEFAULT_INSTR;
     vm->pointer_stack = FOX32_POINTER_DEFAULT_STACK;
     vm->halted = true;
@@ -376,6 +385,17 @@ static void vm_init(vm_t *vm) {
 
     for (int i = 0; i < 256; i++) {
         vm->pending_vectors[i] = 0;
+    }
+}
+
+static void vm_exit(vm_t *vm) {
+    if (vm->memory_ram) {
+        free(vm->memory_ram);
+        vm->memory_ram = NULL;
+    }
+    if (vm->vram_allocated) {
+        free(vm->memory_vram);
+        vm->memory_vram = NULL;
     }
 }
 
@@ -434,7 +454,13 @@ static uint8_t *vm_findmemory_phys(vm_t *vm, uint32_t address, uint32_t size, bo
     uint32_t address_end = address + size;
 
     if (address_end > address) {
-        if (address_end <= FOX32_MEMORY_RAM) {
+        if (
+            (address >= FOX32_MEMORY_VRAM_START) &&
+            (address - FOX32_MEMORY_VRAM_START) + size <= FOX32_MEMORY_VRAM
+        ) {
+            return &vm->memory_vram[address - FOX32_MEMORY_VRAM_START];
+        }
+        if (address_end <= vm->memory_ram_size) {
             return &vm->memory_ram[address];
         }
         if (
@@ -1355,8 +1381,11 @@ static fox32_err_t vm_safepop_word(vm_t *vm, uint32_t *value) {
 const char *fox32_strerr(fox32_err_t err) {
     return err_tostring(err);
 }
-void fox32_init(fox32_vm_t *vm) {
-    vm_init(vm);
+void fox32_init(fox32_vm_t *vm, uint32_t memory_size) {
+    vm_init(vm, memory_size);
+}
+void fox32_exit(fox32_vm_t *vm) {
+    vm_exit(vm);
 }
 fox32_err_t fox32_step(fox32_vm_t *vm) {
     return vm_step(vm);

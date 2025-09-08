@@ -26,7 +26,7 @@ overlay_t *overlay_get(uint32_t index) {
 void draw_framebuffer(struct Screen *screen) {
     SDL_Texture *texture = ScreenGetTexture(screen);
 
-    memcpy(framebuffer, &vm.memory_ram[0x02000000], FRAMEBUFFER_WIDTH * FRAMEBUFFER_HEIGHT * 4);
+    memcpy(framebuffer, vm.memory_vram, FRAMEBUFFER_WIDTH * FRAMEBUFFER_HEIGHT * 4);
 
     for (size_t i = 0; i < 32; i++) {
         overlay_t *overlay = &overlays[i];

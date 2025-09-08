@@ -7,7 +7,9 @@
 
 #define FOX32_CPU_HZ 33000000
 
-#define FOX32_MEMORY_RAM 0x04000000 //  64 MiB
+#define FOX32_MEMORY_VRAM 0x0012C000 // 640x480x4
+#define FOX32_MEMORY_VRAM_START 0x02000000
+
 #define FOX32_MEMORY_ROM 0x00080000 // 512 KiB
 #define FOX32_MEMORY_ROM_START 0xF0000000
 
@@ -75,11 +77,15 @@ typedef struct {
     uint16_t deferred_interrupt_count;
 
     uint8_t pending_vectors[256];
-    uint8_t memory_ram[FOX32_MEMORY_RAM];
+    uint32_t memory_ram_size;
+    uint8_t *memory_ram;
+    uint8_t *memory_vram;
+    bool vram_allocated;
     uint8_t memory_rom[FOX32_MEMORY_ROM];
 } fox32_vm_t;
 
-void fox32_init(fox32_vm_t *vm);
+void fox32_init(fox32_vm_t *vm, uint32_t memory_size);
+void fox32_exit(fox32_vm_t *vm);
 
 fox32_err_t fox32_step(fox32_vm_t *vm);
 fox32_err_t fox32_resume(fox32_vm_t *vm, uint32_t count, uint32_t *executed);

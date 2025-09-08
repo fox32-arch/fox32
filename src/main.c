@@ -47,15 +47,11 @@ void main_loop(void);
 void load_rom(const char *filename);
 
 int main(int argc, char *argv[]) {
-    fox32_init(&vm);
-    vm.io_read = bus_io_read;
-    vm.io_write = bus_io_write;
-    vm.halted = false;
-    vm.debug = false;
-
-    memcpy(vm.memory_rom, fox32rom, sizeof(fox32rom));
-
+    uint32_t memory_size = 64 * 1024 * 1024; // 64 MiB
     size_t disk_id = 0;
+    char *rom_path = NULL;
+    bool debug = false;
+    bool headless = false;
     int filtering_mode = 0;
 #ifndef __EMSCRIPTEN__
     for (int i = 1; i < argc; i++) {
@@ -69,6 +65,7 @@ int main(int argc, char *argv[]) {
                 "  --rom ROM          Specify a ROM image to use\n"
                 "  --debug            Enable debug output\n"
                 "  --headless         Headless mode: don't open a window\n"
+                "  --memory SIZE      Specify RAM size in MiB\n"
                 "  --filtering MODE   Set scale filtering mode for high DPI displays\n"
                 "                       0 = nearest pixel (default)\n"
                 "                       1 = linear filtering\n",
@@ -85,16 +82,30 @@ int main(int argc, char *argv[]) {
             }
         } else if (strcmp(argv[i], "--rom") == 0) {
             if (i + 1 < argc) {
-                load_rom(argv[i + 1]);
+                rom_path = argv[i + 1];
                 i++;
             } else {
                 fprintf(stderr, "no ROM image specified\n");
                 return 1;
             }
         } else if (strcmp(argv[i], "--debug") == 0) {
-            vm.debug = true;
+            debug = true;
         } else if (strcmp(argv[i], "--headless") == 0) {
-            vm.headless = true;
+            headless = true;
+        } else if (strcmp(argv[i], "--memory") == 0) {
+            if (i + 1 < argc) {
+                char *end_ptr;
+                memory_size = (uint32_t) strtol(argv[i + 1], &end_ptr, 10) * 1024 * 1024;
+                printf("memory size: %u bytes\n", memory_size);
+                if (end_ptr == argv[i + 1]) {
+                    fprintf(stderr, "bad memory size specified\n");
+                    return 1;
+                }
+                i++;
+            } else {
+                fprintf(stderr, "no memory size specified\n");
+                return 1;
+            }
         } else if (strcmp(argv[i], "--filtering") == 0) {
             if (i + 1 < argc) {
                 if (strcmp(argv[i + 1], "0") == 0) {
@@ -115,9 +126,23 @@ int main(int argc, char *argv[]) {
             return 1;
         }
     }
-#else
+#endif
+
+    fox32_init(&vm, memory_size);
+    vm.io_read = bus_io_read;
+    vm.io_write = bus_io_write;
+    vm.halted = false;
+    vm.debug = debug;
+    vm.headless = headless;
+
+#ifdef __EMSCRIPTEN__
     new_disk("fox32os.img", disk_id++);
 #endif
+
+    if (rom_path)
+        load_rom(rom_path);
+    else
+        memcpy(vm.memory_rom, fox32rom, sizeof(fox32rom));
 
     if (!vm.headless) {
         if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
@@ -165,6 +190,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    fox32_exit(&vm);
     return 0;
 }
 

@@ -15,16 +15,17 @@ Releases available on the [Releases page](https://github.com/fox32-arch/fox32/re
 
 ### Building
 
-Download the latest release or commit of [**fox32rom**](https://github.com/fox32-arch/fox32rom), and place the downloaded `fox32.rom` file into the root directory of this repo. Then simply run `make`. The resulting binary will be saved as `fox32`. Optionally you may build for a different target with `make TARGET=<target>`, see the Makefile for details.
+Download the latest release or commit of [fox32rom](https://github.com/fox32-arch/fox32rom), and place the downloaded `fox32.rom` file into the root directory of this repo. Then simply run `make`. The resulting binary will be saved as `fox32`. Optionally you may build for a different target with `make TARGET=<target>`, see the Makefile for details.
 
 ### Usage
 
 The following arguments are valid:
 - `--disk <file>`: mount the specified file as a disk
-- `--rom <file>`: use the specified file as the boot ROM; if this argument is not specified then the embedded copy of **fox32rom** is used
+- `--rom <file>`: use the specified file as the boot ROM; defaults to embedded copy of fox32rom
+- `--memory <mib>`: specify the amount of memory in MiB; defaults to 64 MiB
 - `--debug`: print a disassembly of each instruction as it runs
 
-The most common use case is passing the [**fox32os**](https://github.com/fox32-arch/fox32os) disk image as the first disk: `./fox32 --disk fox32os.img`
+The most common use case is passing the [fox32os](https://github.com/fox32-arch/fox32os) disk image as the first disk: `./fox32 --disk fox32os.img`
 
 See [encoding.md](docs/encoding.md) and [cpu.md](docs/cpu.md) for information about the instruction set.
 
