@@ -24,6 +24,9 @@ The following arguments are valid:
 - `--rom <file>`: use the specified file as the boot ROM; defaults to embedded copy of fox32rom
 - `--memory <mib>`: specify the amount of memory in MiB; defaults to 64 MiB
 - `--scale <multiplier>`: scale the display window; can be set at compile time with `make SCALE=<multiplier>`
+- `--filtering <mode>`: set scale filtering mode for high DPI displays
+    - 0 = nearest pixel (default)
+    - 1 = linear filtering
 - `--debug`: print a disassembly of each instruction as it runs
 
 The most common use case is passing the [fox32os](https://github.com/fox32-arch/fox32os) disk image as the first disk: `./fox32 --disk fox32os.img`
