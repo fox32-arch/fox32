@@ -9,14 +9,12 @@
 
 #include "screen.h"
 
-#ifndef SCREEN_ZOOM
-#define SCREEN_ZOOM 1
-#endif
-
 struct Screen MainScreen;
 
 int WindowWidth = 0;
 int WindowHeight = 0;
+
+int ScreenScale = SCREEN_ZOOM;
 
 bool ScreenFirstDraw = true;
 
@@ -29,8 +27,8 @@ void ScreenInit() {
     ScreenWindow = SDL_CreateWindow(
         "fox32 emulator",
         SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-        (int)(WindowWidth * SCREEN_ZOOM),
-        (int)(WindowHeight * SCREEN_ZOOM),
+        (int)(WindowWidth * ScreenScale),
+        (int)(WindowHeight * ScreenScale),
         SDL_WINDOW_HIDDEN | SDL_WINDOW_ALLOW_HIGHDPI
     );
 

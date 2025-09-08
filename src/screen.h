@@ -2,6 +2,10 @@
 
 #include <SDL2/SDL.h>
 
+#ifndef SCREEN_ZOOM
+#define SCREEN_ZOOM 1
+#endif
+
 struct Screen;
 
 typedef void (*ScreenDrawF)(struct Screen *screen);

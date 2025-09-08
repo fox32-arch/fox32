@@ -50,6 +50,9 @@ all: fox32$(TARGET_FILE_EXTENSION)
 FOX32ROM_IN = fox32.rom
 FOX32ROM_OUT = fox32rom.h
 
+SCALE = 1
+CFLAGS += -DSCREEN_ZOOM=$(SCALE)
+
 $(FOX32ROM_OUT): $(FOX32ROM_IN)
 	xxd -i $(FOX32ROM_IN) $(FOX32ROM_OUT)
 	sed -i -e 's/fox32_rom/fox32rom/' $(FOX32ROM_OUT)

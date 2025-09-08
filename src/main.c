@@ -34,6 +34,7 @@ fox32_vm_t vm;
 extern bool bus_requests_exit;
 extern disk_controller_t disk_controller;
 extern sound_t snd;
+extern int ScreenScale;
 
 uint32_t tick_start;
 uint32_t tick_end;
@@ -66,10 +67,11 @@ int main(int argc, char *argv[]) {
                 "  --debug            Enable debug output\n"
                 "  --headless         Headless mode: don't open a window\n"
                 "  --memory SIZE      Specify RAM size in MiB\n"
+                "  --scale MULT       Scale display by MULT (default multiplier is %d)\n"
                 "  --filtering MODE   Set scale filtering mode for high DPI displays\n"
                 "                       0 = nearest pixel (default)\n"
                 "                       1 = linear filtering\n",
-                argv[0]
+                argv[0], SCREEN_ZOOM
             );
             return 0;
         } else if (strcmp(argv[i], "--disk") == 0) {
@@ -104,6 +106,19 @@ int main(int argc, char *argv[]) {
                 i++;
             } else {
                 fprintf(stderr, "no memory size specified\n");
+                return 1;
+            }
+        } else if (strcmp(argv[i], "--scale") == 0) {
+            if (i + 1 < argc) {
+                char *end_ptr;
+                ScreenScale = (int) strtol(argv[i + 1], &end_ptr, 10);
+                if (end_ptr == argv[i + 1]) {
+                    fprintf(stderr, "bad scale multiplier specified\n");
+                    return 1;
+                }
+                i++;
+            } else {
+                fprintf(stderr, "no scale multiplier specified\n");
                 return 1;
             }
         } else if (strcmp(argv[i], "--filtering") == 0) {
