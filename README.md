@@ -20,6 +20,7 @@ Download the latest release or commit of [fox32rom](https://github.com/fox32-arc
 ### Usage
 
 The following arguments are valid:
+- `--verbose`: print runtime logs about the options specified below
 - `--disk <file>`: mount the specified file as a disk
 - `--rom <file>`: use the specified file as the boot ROM; defaults to embedded copy of fox32rom
 - `--memory <mib>`: specify the amount of memory in MiB; defaults to 64 MiB

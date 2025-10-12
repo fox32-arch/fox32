@@ -23,6 +23,8 @@
 #include "serial.h"
 #include "sound.h"
 
+#include "log.h"
+
 #include "../fox32rom.h"
 
 #define FPS 60
@@ -35,6 +37,8 @@ extern bool bus_requests_exit;
 extern disk_controller_t disk_controller;
 extern sound_t snd;
 extern int ScreenScale;
+
+bool should_log = false;
 
 uint32_t tick_start;
 uint32_t tick_end;
@@ -62,6 +66,7 @@ int main(int argc, char *argv[]) {
                 "Usage: %s [OPTIONS]\n\n"
                 "Options:\n"
                 "  --help             Print this message\n"
+                "  --verbose          Print info about options specified\n"
                 "  --disk DISK        Specify a disk image to use\n"
                 "  --rom ROM          Specify a ROM image to use\n"
                 "  --debug            Enable debug output\n"
@@ -74,6 +79,8 @@ int main(int argc, char *argv[]) {
                 argv[0], SCREEN_ZOOM
             );
             return 0;
+        } else if (strcmp(argv[i], "--verbose") == 0) {
+            should_log = true;
         } else if (strcmp(argv[i], "--disk") == 0) {
             if (i + 1 < argc) {
                 new_disk(argv[i + 1], disk_id++);
@@ -98,7 +105,7 @@ int main(int argc, char *argv[]) {
             if (i + 1 < argc) {
                 char *end_ptr;
                 memory_size = (uint32_t) strtol(argv[i + 1], &end_ptr, 10) * 1024 * 1024;
-                printf("memory size: %u bytes\n", memory_size);
+                LOG("memory size: %u bytes\n", memory_size);
                 if (end_ptr == argv[i + 1]) {
                     fprintf(stderr, "bad memory size specified\n");
                     return 1;
@@ -268,7 +275,7 @@ void load_rom(const char *filename) {
         fprintf(stderr, "couldn't find ROM file %s\n", filename);
         exit(1);
     }
-    printf("using %s as boot ROM\n", filename);
+    LOG("using %s as boot ROM\n", filename);
 
     if (fread(&vm.memory_rom, sizeof(fox32rom), 1, rom) != 1) {
         fprintf(stderr, "error reading ROM file %s\n", filename);
