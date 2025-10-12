@@ -31,6 +31,10 @@
 #define TPF 1
 #define TPS (FPS * TPF)
 
+#ifndef SCREEN_FILTER
+#define SCREEN_FILTER 1
+#endif
+
 fox32_vm_t vm;
 
 extern bool bus_requests_exit;
@@ -57,7 +61,7 @@ int main(int argc, char *argv[]) {
     char *rom_path = NULL;
     bool debug = false;
     bool headless = false;
-    int filtering_mode = 0;
+    int filtering_mode = SCREEN_FILTER;
 #ifndef __EMSCRIPTEN__
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0) {

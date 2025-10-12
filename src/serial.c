@@ -1,10 +1,14 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#include <emscripten/html5.h>
+#endif
 
 static bool is_terminal = false;
 
-#if !defined(WINDOWS)
+#if !defined(WINDOWS) && !defined(__EMSCRIPTEN__)
 #include <sys/select.h>
 #include <unistd.h>
 #include <termios.h>
@@ -103,7 +107,16 @@ int serial_get(void) {
 
 #endif
 
+#ifdef __EMSCRIPTEN__
+void serial_init(void) {}
+int serial_get(void) { return 0; }
+void serial_put(int value) {
+    char c = value;
+    emscripten_out(&c);
+}
+#else
 void serial_put(int value) {
     putchar((int) value);
     fflush(stdout);
 }
+#endif

@@ -18,8 +18,9 @@ LDFLAGS += -lmingw32 -lSDL2main -lSDL2 -L/usr/local/x86_64-w64-mingw32/lib -lmin
 TARGET_FILE_EXTENSION = .exe
 else
 ifeq ($(TARGET),wasm)
+FILTER = 1
 CC = emcc
-CFLAGS += -O3 -std=c99 -Wall -Wextra
+CFLAGS += -O3 -std=c99 -Wall -Wextra -sUSE_SDL=2
 LDFLAGS += -s TOTAL_MEMORY=70057984 -sALLOW_MEMORY_GROWTH=1 -sUSE_SDL=2 --preload-file fox32os.img
 TARGET_EXTRADEPS = fox32os.img
 TARGET_FILE_EXTENSION = .html
@@ -50,8 +51,9 @@ all: fox32$(TARGET_FILE_EXTENSION)
 FOX32ROM_IN = fox32.rom
 FOX32ROM_OUT = fox32rom.h
 
-SCALE = 1
-CFLAGS += -DSCREEN_ZOOM=$(SCALE)
+SCALE ?= 1
+FILTER ?= 0
+CFLAGS += -DSCREEN_ZOOM=$(SCALE) -DSCREEN_FILTER=$(FILTER)
 
 $(FOX32ROM_OUT): $(FOX32ROM_IN)
 	xxd -i $(FOX32ROM_IN) $(FOX32ROM_OUT)
