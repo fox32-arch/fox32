@@ -111,8 +111,8 @@ int serial_get(void) {
 void serial_init(void) {}
 int serial_get(void) { return 0; }
 void serial_put(int value) {
-    char c = value;
-    emscripten_out(&c);
+    char c[2] = { value, 0 };
+    emscripten_out(&c[0]);
 }
 #else
 void serial_put(int value) {
