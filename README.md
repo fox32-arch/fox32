@@ -9,6 +9,8 @@ This is the reference emulator of the fox32 platform. See the [organization root
 
 ## Getting Started
 
+**Quick setup**: See the [build-all repository](https://github.com/fox32-arch/build-all) to quickly get a working fox32os environment.
+
 Prebuilt Linux binaries of the latest commit are available on the [GitHub Actions page](https://github.com/fox32-arch/fox32/actions).
 
 Releases available on the [Releases page](https://github.com/fox32-arch/fox32/releases) are **very outdated** at the moment and should not be used.

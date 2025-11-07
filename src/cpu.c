@@ -754,7 +754,7 @@ static bool vm_shouldskip(vm_t *vm, uint8_t condition) {
 static void vm_skipparam(vm_t *vm, uint32_t size, uint8_t prtype, uint8_t offset) {
     if (prtype < TY_IMM) {
         vm->pointer_instr_mut += SIZE8;
-        if (offset && prtype==TY_REGPTR) 
+        if (offset && prtype==TY_REGPTR)
             vm->pointer_instr_mut += SIZE8;
     } else if (prtype == TY_IMMPTR) {
         vm->pointer_instr_mut += SIZE32;
