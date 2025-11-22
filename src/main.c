@@ -204,6 +204,8 @@ int main(int argc, char *argv[]) {
     emscripten_set_main_loop(main_loop, FPS, 1);
 #endif
 
+    LOG0("beginning execution\n\n");
+
     while (!done && !bus_requests_exit) {
         main_loop();
 
@@ -212,7 +214,7 @@ int main(int argc, char *argv[]) {
         if (delay > 0) {
             SDL_Delay(delay);
         } else {
-            //printf("time overrun %d\n", delay);
+            //LOG("time overrun %d\n", delay);
         }
     }
 

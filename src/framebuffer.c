@@ -12,14 +12,20 @@
 #include "cpu.h"
 #include "framebuffer.h"
 #include "screen.h"
+#include "log.h"
 
 extern fox32_vm_t vm;
 
 static uint8_t framebuffer[FRAMEBUFFER_WIDTH * FRAMEBUFFER_HEIGHT * 4];
 static overlay_t overlays[32];
 
+overlay_t dummy_overlay;
+
 overlay_t *overlay_get(uint32_t index) {
-    if (index >= 32) abort();
+    if (index >= 32) {
+        FORCE_LOG("overlay ID out of bounds: %d\n", index);
+        return &dummy_overlay; // proper error handling would be nice
+    }
     return &overlays[index];
 }
 
@@ -33,6 +39,8 @@ void draw_framebuffer(struct Screen *screen) {
         if (!overlay->enabled) continue;
 
         size_t pointer = overlay->pointer;
+        if (pointer >= vm.memory_ram_size)
+            FORCE_LOG("overlay %ld pointer out of bounds: 0x%lX\n", i, pointer);
 
         size_t height = overlay->height;
         size_t width = overlay->width;
