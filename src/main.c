@@ -27,7 +27,11 @@
 
 #include "../fox32rom.h"
 
+#ifdef __EMSCRIPTEN__
+#define FPS 120
+#else
 #define FPS 60
+#endif
 #define TPF 1
 #define TPS (FPS * TPF)
 
