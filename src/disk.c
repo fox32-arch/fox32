@@ -7,6 +7,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#include <emscripten/html5.h>
+#endif
 
 #include "cpu.h"
 #include "disk.h"
@@ -19,6 +23,9 @@ extern fox32_vm_t vm;
 
 extern bool should_log;
 
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE
+#endif
 void new_disk(const char *filename, size_t id) {
     if (id > 3) { LOG0("attempting to insert disk with ID > 3"); return; }
     LOG("inserting %s as disk ID %d\n", filename, (int) id);
