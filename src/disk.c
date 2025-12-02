@@ -46,6 +46,9 @@ void insert_disk(disk_t disk, size_t id) {
     disk_controller.disks[id] = disk;
 }
 
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE
+#endif
 void remove_disk(size_t id) {
     if (id > 3) { LOG0("attempting to remove disk with ID > 3"); return; }
     if (disk_controller.disks[id].file) {
