@@ -319,6 +319,9 @@ int bus_io_write(void *user, uint32_t value, uint32_t port) {
                     snd.channel[channel].loop = value & 0x00000080;
                     snd.channel[channel].enable = value & 0x00000100;
                     snd.channel[channel].bits16 = value & 0x00000200;
+				    if (snd.channel[channel].enable) {
+				        snd.channel[channel].position = snd.channel[channel].start;
+				    }
                     break;
                 }
                 case 0x6: {
