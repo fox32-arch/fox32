@@ -13,6 +13,10 @@
 
 sound_t snd;
 extern fox32_vm_t vm;
+static int16_t ring_buffer[48000];
+static uint32_t write_pos = 0;
+static uint32_t read_pos = 0;
+static uint32_t cycles_pending = 0;
 
 void sound_step() {
     /* manual mixing */
@@ -112,23 +116,47 @@ void sound_step() {
         snd.out_left += (int32_t)(sum * ((float)(snd.channel[i].left_volume) / 255.0f));
         snd.out_right += (int32_t)(sum * ((float)(snd.channel[i].right_volume) / 255.0f));
     }
+    int32_t left = snd.out_left >> 1;
+    int32_t right = snd.out_right >> 1;
+    /* clamp the audio so we don't overflow */
+    if (left > 32767) left = 32767;
+    if (left < -32768) left = -32768;
+        
+    if (right > 32767) right = 32767;
+    if (right < -32768) right = -32768;
+
+    ring_buffer[write_pos++] = (int16_t)left;
+    ring_buffer[write_pos++] = (int16_t)right;
+    write_pos %= 48000;
 }
 
 void sound_callback(void* userdata, uint8_t* stream, int len) {
     (void)userdata; /* all warnings on, userdata is unused, suppress that warning */
     int16_t* buffer = (int16_t*)stream;
-    for (int i=0; i<len/4; i++) {
+    /* we generate samples every frame into a ring buffer
+       therefore we only need the callback to read from it */
+    for (int i=0; i<(len/2); i++) {
+        if (read_pos != write_pos) {
+            buffer[i] = ring_buffer[read_pos];
+            read_pos = (read_pos + 1) % 48000;
+        } else {
+            buffer[i] = 0;
+        }
+    }
+}
+
+void sound_sync(uint32_t cycles_executed) {
+    cycles_pending += cycles_executed;
+    
+    static uint32_t frac = 0; /* we can't have half a sample */ 
+    
+    uint32_t total_frac = cycles_pending * 2 + frac; /* multiply by 2 and avoid decimals */
+    uint32_t generated = total_frac / 1375;  /* how many samples? */
+    frac = total_frac % 1375; /* remainder */
+    cycles_pending = 0; /* reset for next frame */
+    
+    for (uint32_t i = 0; i < generated; i++) {
         sound_step();
-        int32_t left = snd.out_left >> 1;
-        int32_t right = snd.out_right >> 1;
-        /* clamp the audio so we don't overflow */
-        if (left > 32767) left = 32767;
-        if (left < -32768) left = -32768;
-        
-        if (right > 32767) right = 32767;
-        if (right < -32768) right = -32768;
-        buffer[(i*2)] = left;
-        buffer[(i*2)+1] = right;
     }
 }
 

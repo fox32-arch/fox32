@@ -41,6 +41,7 @@ typedef struct {
 } sound_t;
 
 void sound_init();
+void sound_sync(uint32_t cycles_executed);
 
 /*
 audio ports start at 0x80000600

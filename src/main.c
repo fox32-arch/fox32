@@ -239,6 +239,7 @@ void main_loop(void) {
 
     int cycles_per_tick = FOX32_CPU_HZ / TPS / dt;
     int extra_cycles = FOX32_CPU_HZ / TPS - (cycles_per_tick * dt);
+    int frame_cycles = 0;
 
     fox32_err_t error = FOX32_ERR_OK;
 
@@ -255,6 +256,7 @@ void main_loop(void) {
             uint32_t executed = 0;
 
             error = fox32_resume(&vm, cycles_left, &executed);
+            frame_cycles += executed;
             if (error != FOX32_ERR_OK) {
                 if (vm.debug) puts(fox32_strerr(error));
                 error = fox32_recover(&vm, error);
@@ -274,6 +276,7 @@ void main_loop(void) {
     }
 
     done = ScreenProcessEvents();
+    sound_sync(frame_cycles);
 
     ticks++;
 }
