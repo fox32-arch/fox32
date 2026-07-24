@@ -253,10 +253,13 @@ void main_loop(void) {
             cycles_left += extra_cycles;
 
         while (cycles_left > 0) {
+            uint32_t timeslice = (cycles_left < 2000) ? cycles_left : 2000;
             uint32_t executed = 0;
 
-            error = fox32_resume(&vm, cycles_left, &executed);
+            //error = fox32_resume(&vm, cycles_left, &executed);
+            error = fox32_resume(&vm, timeslice, &executed);
             frame_cycles += executed;
+            sound_sync(executed);
             if (error != FOX32_ERR_OK) {
                 if (vm.debug) puts(fox32_strerr(error));
                 error = fox32_recover(&vm, error);
@@ -276,7 +279,7 @@ void main_loop(void) {
     }
 
     done = ScreenProcessEvents();
-    sound_sync(frame_cycles);
+    //sound_sync(frame_cycles);
 
     ticks++;
 }

@@ -29,8 +29,11 @@ Registers relating to the current status of the audio controller are located at 
 --------|------------------
   0x80  | audio controller sample base
   0x81  | audio controller state
+  0x82  | audio controller buffer 0 start location
+  0x83  | audio controller buffer 1 start location
+  0x84  | audio controller buffer length
 
-The range from 0x82-0xFF is unused and reserved for future expansions.
+The range from 0x85-0xFF is unused and reserved for future expansions.
 
 The samples provided to the audio controller must be signed.
 Playing an unsigned sample will cause artifacts and distorted playback.
@@ -81,6 +84,8 @@ and write the resulting rate of 65536 to this register.
   6:0   | volume (0-127)
 
 When using 16-bit PCM, the audio controller fetches 16-bit data as a little-endian word.
+The enable bit is write-strobed, therefore if you write a 1 to it, it will restart the
+channel from its start address, and a 0 will silence the output.
 
 ### 0xX6: Audio panning control (Read, Write)
 
@@ -99,8 +104,22 @@ write to it to set the base.
 --------|------------------
   15:8  | buffer rate
   5:4   | buffer format
-  1     | refill pending flag (read-only)
+  2     | buffer 1 refill pending flag
+  1     | buffer 0 refill pending flag
   0     | buffer mode (0=use channels, 1=use buffer)
+
+During a refill interrupt, a 0 should be written to the corresponding buffer refill pending flag. This can be done with
+the following:
+```avrasm
+; acknowledge interrupt for buffer 0
+in r0, 0x80000681
+bcl r0, 1
+out 0x80000681, r0
+; acknowledge interrupt for buffer 1
+in r0, 0x80000681
+bcl r0, 2
+out 0x80000681, r0
+```
 
 Bits 15 to 8 specify the rate at which samples are fetched from the buffer. The formula for calculating
 the rate for a given sample rate (F) is $\frac{F}{48000}\times2^{7}$. A value of 0 halts the internal counter and
@@ -113,9 +132,8 @@ no samples are fetched until a non-zero rate is set.
   0        | stops playback
   \>128    | undefined behaviour
 
-If bit 0 of this port is set, the channels are disabled and the controller expects
-a contiguous area of 32 kilobytes (32,768 bytes) relative to the sample base (specified at port 0x80) for the audio buffer. This allows for
-software-driven mixing and provides more control over the audio output.
+If bit 0 of this port is set, the channels are disabled and the controller uses 2 buffers for audio output. This allows for
+software-driven mixing and provides more control over the audio output. This mode is explained in the next section.
 The format of this buffer is determined by bits 4 and 5:
   value    | description
 -----------|--------------------
@@ -124,20 +142,26 @@ The format of this buffer is determined by bits 4 and 5:
   0b10 (2) | stereo 8-bit
   0b11 (3) | stereo 16-bit
 
-Stereo samples are fetched as frames containing left and right samples. For example, if the buffer is using stereo 8-bit PCM,
+### 0x82: Audio controller buffer 0 start address (Read, Write)
+Read from this register to get the current base address from which buffer 0 is located and
+write to it to set the address of buffer 0.
+
+### 0x83: Audio controller buffer 1 start address (Read, Write)
+Read from this register to get the current base address from which buffer 1 is located and
+write to it to set the address of buffer 1.
+
+### 0x84: Audio controller buffer length (Read, Write)
+Read from this register to get the size of the audio buffer (or to be more precise, the half-size of the audio buffer).
+Write to this register to set the size of the audio buffer. This register sets the length of both buffer 0 and 1.
+
+## Buffer mode
+When buffer mode is enabled, the audio controller disables usage of the 8 sample channels and uses 2 buffers (Buffer 0 and Buffer 1)
+to output samples. When the controller starts reading samples, it will read Buffer 0 first. When it has reached the end of Buffer 0,
+it will interrupt to the CPU to refill Buffer 0 (vector 0xFD), while it starts reading Buffer 1. When it reaches the end of Buffer 1, 
+it will also interrupt the CPU to refill Buffer 1 (vector 0xFE), and restarts reading from Buffer 0. The start address for Buffer 0 is
+determined by port 0x82, and 0x83 for Buffer 1. The length of these buffers is set by port 0x84.
+
+Stereo samples are fetched as frames containing left and right samples. For example, if the buffer is set to stereo 8-bit PCM,
 it fetches the left sample first (1 byte), then the right sample last (1 byte), advancing the internal position by 2 bytes.
 For stereo 16-bit PCM, it fetches the left sample word first (2 bytes) and the right sample word last (2 bytes),
 advancing the internal position by 4 bytes.
-
-The audio controller always uses a 32768 byte buffer, regardless of the format.
-Consequently, the effective buffer size is variable depending on the format:
-  format        | size (bytes) | buffer size (samples)
-----------------|--------------|---------------------------
-  mono 8-bit    | 1            | 32768
-  mono 16-bit   | 2            | 16384
-  stereo 8-bit  | 2            | 16384
-  stereo 16-bit | 4            | 8192
-
-Whenever the internal position is half-way through the buffer, it raises an interrupt of vector 0xFE (address 0x000003F8).
-When this interrupt is raised, the refill pending flag (bit 1) is set. The flag is cleared when the buffer wraps around to its beginning.
-The processor cannot write to this flag; it can only read from it.

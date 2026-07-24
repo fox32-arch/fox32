@@ -24,48 +24,68 @@ void sound_step() {
         uint8_t old_phase = snd.buffer_phase;
         snd.buffer_phase += snd.buffer_rate;
         if ((old_phase & 0x80) != (snd.buffer_phase & 0x80)) {
-            uint32_t abs = snd.base + snd.buffer_pos;
+            uint32_t curr_base = (snd.active_buffer == 0) ? snd.buf0_base : snd.buf1_base;
+            uint32_t abs = curr_base + snd.buffer_pos;
             switch (snd.buffer_mode & 3) {
                 case 0: {
                     /* mono 8-bit */
-                    snd.out_left = (int16_t)vm.memory_ram[abs] << 8;
+                    snd.out_left = (int16_t)(int8_t)vm.memory_ram[abs] << 8;
                     snd.out_right = snd.out_left;
                     snd.buffer_pos += 1;
                     break;
                 }
                 case 1: {
                     /* mono 16-bit */
-                    snd.out_left = vm.memory_ram[abs] | (vm.memory_ram[abs+1] << 8);
+                    snd.out_left = (int16_t)(vm.memory_ram[abs] | (vm.memory_ram[abs+1] << 8));
                     snd.out_right = snd.out_left;
                     snd.buffer_pos += 2;
                     break;
                 }
                 case 2: {
                     /* stereo 8-bit */
-                    snd.out_left = (int16_t)vm.memory_ram[abs] << 8;
-                    snd.out_right = (int16_t)vm.memory_ram[abs+1] << 8;
+                    snd.out_left = (int16_t)(int8_t)vm.memory_ram[abs] << 8;
+                    snd.out_right = (int16_t)(int8_t)vm.memory_ram[abs+1] << 8;
                     snd.buffer_pos += 2;
                     break;
                 }
                 case 3: {
                     /* stereo 16-bit */
-                    snd.out_left = vm.memory_ram[abs] | (vm.memory_ram[abs+1] << 8);
-                    snd.out_right = vm.memory_ram[abs+2] | (vm.memory_ram[abs+3] << 8);
+                    snd.out_left = (int16_t)(vm.memory_ram[abs] | (vm.memory_ram[abs+1] << 8));
+                    snd.out_right = (int16_t)(vm.memory_ram[abs+2] | (vm.memory_ram[abs+3] << 8));
                     snd.buffer_pos += 4;
                     break;
                 }
             }
         }
-        snd.buffer_pos = snd.buffer_pos % FOX32_AUDIO_BUFFER_SIZE;
-        if (snd.buffer_pos < (FOX32_AUDIO_BUFFER_SIZE/2)) {
-            snd.refill_pending = false;
-        }
-        if (snd.buffer_pos >= (FOX32_AUDIO_BUFFER_SIZE/2)) {
-            if (!snd.refill_pending) {
-                fox32_raise(&vm, FOX32_AUDIO_BUFFER_IRQ);
-                snd.refill_pending = true;
+        if (snd.buffer_pos >= snd.buffer_size) {
+            snd.buffer_pos = 0;
+            if (snd.active_buffer == 0) {
+                snd.active_buffer = 1;
+                if (!snd.buf0_refill_pending) {
+                    snd.buf0_refill_pending = true;
+                    fox32_raise(&vm, FOX32_AUDIO_BUF0_IRQ);
+                }
+            } else {
+                snd.active_buffer = 0;
+                if (!snd.buf1_refill_pending) {
+                    snd.buf1_refill_pending = true;
+                    fox32_raise(&vm, FOX32_AUDIO_BUF1_IRQ);
+                }
             }
         }
+        
+        int32_t left = snd.out_left >> 1;
+        int32_t right = snd.out_right >> 1;
+        /* clamp the audio so we don't overflow */
+        if (left > 32767) left = 32767;
+        if (left < -32768) left = -32768;
+            
+        if (right > 32767) right = 32767;
+        if (right < -32768) right = -32768;
+
+        ring_buffer[write_pos++] = (int16_t)left;
+        ring_buffer[write_pos++] = (int16_t)right;
+        write_pos %= 48000;
         return;
     }
     
@@ -89,7 +109,7 @@ void sound_step() {
                     uint32_t abs = snd.base + snd.channel[i].position;
                     if (snd.channel[i].bits16) {
                         /* 16-bit PCM mode */
-                        snd.channel[i].data = (vm.memory_ram[abs]) | (vm.memory_ram[abs+1] << 8);
+                        snd.channel[i].data = (int16_t)(vm.memory_ram[abs]) | (vm.memory_ram[abs+1] << 8);
                         snd.channel[i].position += 2;
                     } else {
                         /* 8-bit PCM mode */
@@ -133,14 +153,21 @@ void sound_step() {
 void sound_callback(void* userdata, uint8_t* stream, int len) {
     (void)userdata; /* all warnings on, userdata is unused, suppress that warning */
     int16_t* buffer = (int16_t*)stream;
+    static int16_t last_sample_l = 0;
+    static int16_t last_sample_r = 0;
     /* we generate samples every frame into a ring buffer
        therefore we only need the callback to read from it */
-    for (int i=0; i<(len/2); i++) {
+    for (int i=0; i<(len/2); i+=2) {
         if (read_pos != write_pos) {
-            buffer[i] = ring_buffer[read_pos];
+            last_sample_l = ring_buffer[read_pos];
             read_pos = (read_pos + 1) % 48000;
+            last_sample_r = ring_buffer[read_pos];
+            read_pos = (read_pos + 1) % 48000;
+            buffer[i] = last_sample_l;
+            buffer[i+1] = last_sample_r;
         } else {
-            buffer[i] = 0;
+            buffer[i] = last_sample_l;
+            buffer[i+1] = last_sample_r;
         }
     }
 }

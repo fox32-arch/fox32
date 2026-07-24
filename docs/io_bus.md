@@ -124,6 +124,9 @@ The range from $82-$FF is unused and reserved for future expansions.
   0xX6              | audio channel X panning
   0x80              | audio controller sample base
   0x81              | audio controller state
+  0x82              | audio controller buffer 0 start address
+  0x83              | audio controller buffer 1 start address
+  0x84              | audio controller buffer length
 
 For more details, see [audio.md](audio.md).
 
