@@ -22,6 +22,7 @@
 #include "screen.h"
 #include "serial.h"
 #include "sound.h"
+#include "timer.h"
 
 #include "log.h"
 
@@ -260,6 +261,7 @@ void main_loop(void) {
             error = fox32_resume(&vm, timeslice, &executed);
             frame_cycles += executed;
             sound_sync(executed);
+            timer_sync(vm.instructions);
             if (error != FOX32_ERR_OK) {
                 if (vm.debug) puts(fox32_strerr(error));
                 error = fox32_recover(&vm, error);
