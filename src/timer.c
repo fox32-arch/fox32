@@ -48,20 +48,6 @@ void timer_step() {
     }
 }
 
-uint32_t timer_read_control(void) {
-    uint32_t control = 0;
-
-    for (int i = 0; i < FOX32_TIMER_CHANNELS; i++) {
-        if (tim.timer[i].enable)          control |= (1 << i);          // 3:0
-        if (tim.timer[i].int_pending)     control |= (1 << (4 + i));    // 7:4
-        if (tim.timer[i].clock)           control |= (1 << (8 + i));    // 11:8
-        if (tim.timer[i].reload)          control |= (1 << (12 + i));   // 15:12
-        /* 19:16 are write-strobe, and should read 0 */
-        if (tim.timer[i].cause_interrupt) control |= (1 << (20 + i));   // 23:20
-    }
-    return control;
-}
-
 void timer_sync(uint32_t current_instruction) {
     if (tim.last_update == 0 && current_instruction > 0) {
         tim.last_update = current_instruction;
