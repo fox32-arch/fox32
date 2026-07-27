@@ -82,6 +82,8 @@ typedef struct {
     uint8_t *memory_vram;
     bool vram_allocated;
     uint8_t memory_rom[FOX32_MEMORY_ROM];
+
+    uint32_t instructions;
 } fox32_vm_t;
 
 void fox32_init(fox32_vm_t *vm, uint32_t memory_size);

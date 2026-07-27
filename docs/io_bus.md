@@ -15,7 +15,7 @@ higher bits indicate the function to be performed.
 | 0x80000400 | 0x80000401 | mouse
 | 0x80000500 | 0x80000500 | keyboard
 | 0x80000600 | 0x800006ff | audio
-| 0x80000700 | 0x80000706 | RTC and uptime
+| 0x80000700 | 0x8000070f | RTC and uptime, interval timers
 | 0x80001000 | 0x80005003 | disk
 | 0x80010000 | 0x80010000 | power controller
 
@@ -130,7 +130,7 @@ The range from $82-$FF is unused and reserved for future expansions.
 
 For more details, see [audio.md](audio.md).
 
-## 0x80000700: Real-Time Clock (RTC) and Uptime
+## 0x80000700: Real-Time Clock (RTC) and Uptime, Interval Timers
 
  offset | description
 --------|------------------
@@ -142,7 +142,51 @@ For more details, see [audio.md](audio.md).
   0x05  | second (0-59)
   0x06  | milliseconds since startup
   0x07  | daylight savings time active (zero or non-zero)
+  0x08  | instructions since startup
+  0x09  | tick counter
+  0x0A  | tick base 
+  0x0B  | timer control
+  0x0C  | timer A period (W), counter (R)
+  0x0D  | timer B period (W), counter (R)
+  0x0E  | timer C period (W), counter (R)
+  0x0F  | timer D period (W), counter (R)
 
+### 0x09: Tick counter (read-only)
+
+This register increments by 1 every N instructions, where N is the value in the tick base register.
+
+### 0x0A: Tick base
+
+This register sets the interval at which tick counter is increased.
+
+### 0x0B: Timer control
+
+All bits are grouped together in the order: Timer D -> Timer C -> Timer B -> Timer A.
+
+ bits   | description
+--------|------------------
+  23:20 | 0=disable interrupt, 1=enable interrupt
+  19:16 | (write-only) 1=force reload the corresponding timer
+  15:12 | 0=one-shot, 1=continuous
+  11:8  | 0=clock per tick, 1=clock per instructions
+  7:4   | 0=no interrupt pending, 1=interrupt pending
+  3:0   | 0=disable timer, 1=enable timer
+
+Timers count down from the period, set in ports 0x0C-0x0F, to 0. An interrupt is triggered during the
+transition from 1 to 0. Writing to the timer's period port will not reset the counter, and the new
+period will only take effect after its current period has finished. The counter can be reset with 
+the new period by writing a 1 to bits 16-19 to force reload it.
+During a timer interrupt, the handler must acknowledge the interrupt by writing a 0 to bits 4-7.
+This can be done with the following:
+```avrasm
+in r0, 0x8000070B
+bcl r0, 4 ; acknowledge timer A interrupt
+out 0x8000070B, r0
+```
+It should be noted that the timers are only useful for scheduling code to be executed at certain
+intervals, because they are ticked according to CPU instruction ticks, rather than real time.
+Because instructions are emulated in short bursts, they are not guaranteed to be temporally accurate
+at sub-frame intervals. As such, it is not recommended to use them for precise timekeeping applications.
 
 ## 0x80001000: Disk
 

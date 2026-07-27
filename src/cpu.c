@@ -1261,6 +1261,7 @@ static err_t vm_resume(vm_t *vm, uint32_t count, uint32_t *executed) {
     uint32_t remaining = count;
     while (!vm->halted && !vm->soft_halted && remaining > 0) {
         vm_execute(vm);
+        vm->instructions += 1;
         remaining -= 1;
         *executed += 1;
     }

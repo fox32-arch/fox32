@@ -18,6 +18,7 @@
 #include "mouse.h"
 #include "serial.h"
 #include "sound.h"
+#include "timer.h"
 
 bool bus_requests_exit = false;
 
@@ -28,6 +29,7 @@ extern fox32_vm_t vm;
 extern disk_controller_t disk_controller;
 extern mouse_t mouse;
 extern sound_t snd;
+extern timer_t tim;
 
 int bus_io_read(void *user, uint32_t *value, uint32_t port) {
     (void) user;
@@ -203,6 +205,49 @@ int bus_io_read(void *user, uint32_t *value, uint32_t port) {
             break;
         }
 
+        case 0x80000708 ... 0x8000070F: { // timers port
+            size_t id = port & 0x000000FF;
+            switch (id) {
+                case 0x08: { // time base
+                    *value = vm.instructions;
+                    break;
+                }
+                case 0x09: { // tick counter
+                    timer_sync(vm.instructions);
+                    *value = tim.tick_counter;
+                    break;
+                }
+                case 0x0A: { // tick base
+                    timer_sync(vm.instructions);
+                    *value = tim.tick_base;
+                    break;
+                }
+                case 0x0B: { // timer control
+                    timer_sync(vm.instructions);
+                    // lol!!! compose this on the fly...
+                    uint32_t control = 0;
+
+                    for (int i = 0; i < FOX32_TIMER_CHANNELS; i++) {
+                        if (tim.timer[i].enable)          control |= (1 << i);          // 3:0
+                        if (tim.timer[i].int_pending)     control |= (1 << (4 + i));    // 7:4
+                        if (tim.timer[i].clock)           control |= (1 << (8 + i));    // 11:8
+                        if (tim.timer[i].reload)          control |= (1 << (12 + i));   // 15:12
+                        /* 19:16 are write-strobe, and should read 0 */
+                        if (tim.timer[i].cause_interrupt) control |= (1 << (20 + i));   // 23:20
+                    }
+
+                    *value = control;
+                    break;
+                }
+                case 0x0C ... 0x0F: { // counter value
+                    uint8_t ch = id & 0x03;
+                    *value = tim.timer[ch].counter;
+                    break;
+                }
+            }
+            break;
+        }
+
         case 0x80001000 ... 0x80002003: { // disk controller port
             size_t id = port & 0xFF;
             uint8_t operation = (port & 0x0000F000) >> 8;
@@ -371,6 +416,39 @@ int bus_io_write(void *user, uint32_t value, uint32_t port) {
                         snd.channel[channel].left_volume = (value & 0x0000FF00) >> 8;
                         break;
                     }
+                }
+            }
+            break;
+        }
+
+        case 0x80000708 ... 0x8000070F: { // timers port
+            size_t id = port & 0x000000FF;
+            switch (id) {
+                case 0x0A: { // tick base
+                    timer_sync(vm.instructions);
+                    tim.tick_base = value;
+                    break;
+                }
+                case 0x0B: { // timer control
+                    timer_sync(vm.instructions);
+                    for (int i = 0; i < FOX32_TIMER_CHANNELS; i++) {
+                        tim.timer[i].enable = (value & (1 << i));
+                        tim.timer[i].int_pending = (value & (1 << (4 + i)));
+                        tim.timer[i].clock = (value & (1 << (8 + i)));
+                        tim.timer[i].reload = (value & (1 << (12 + i)));
+                        /* write-strobe to reset counter */
+                        if (value & (1 << (16 + i))) {
+                            tim.timer[i].counter = tim.timer[i].period;
+                        }
+                        tim.timer[i].cause_interrupt = (value & (1 << (20 + i)));
+                    }
+                    break;
+                }
+                case 0x0C ... 0x0F: { // counter value
+                    timer_sync(vm.instructions);
+                    uint8_t ch = id & 0x03;
+                    tim.timer[ch].period = value;
+                    break;
                 }
             }
             break;
