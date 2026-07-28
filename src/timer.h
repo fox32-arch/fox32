@@ -20,6 +20,6 @@ typedef struct {
     uint32_t tick_int_count;
     uint32_t tick_counter;
     uint32_t last_update;
-} timer_t;
+} fox32_timer_t;
 
 void timer_sync(uint32_t current_instruction);

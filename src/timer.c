@@ -11,7 +11,7 @@
 #include "cpu.h"
 #include "timer.h"
 
-timer_t tim;
+fox32_timer_t tim;
 extern fox32_vm_t vm;
 
 void timer_step() {
@@ -20,7 +20,7 @@ void timer_step() {
         if (tim.tick_int_count > 0) {
             tim.tick_int_count--;
         }
-        
+
         if (tim.tick_int_count == 0) {
             tim.tick_int_count = tim.tick_base;
             tim.tick_counter++;
@@ -56,7 +56,7 @@ void timer_sync(uint32_t current_instruction) {
     uint32_t elapsed = current_instruction - tim.last_update;
     if (elapsed == 0) return;
     for (uint32_t i = 0; i < elapsed; i++) {
-        timer_step(); 
+        timer_step();
     }
     tim.last_update = current_instruction;
 }

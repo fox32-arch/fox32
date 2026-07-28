@@ -29,7 +29,7 @@ extern fox32_vm_t vm;
 extern disk_controller_t disk_controller;
 extern mouse_t mouse;
 extern sound_t snd;
-extern timer_t tim;
+extern fox32_timer_t tim;
 
 int bus_io_read(void *user, uint32_t *value, uint32_t port) {
     (void) user;
