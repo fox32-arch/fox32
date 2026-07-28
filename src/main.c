@@ -237,40 +237,35 @@ void main_loop(void) {
     tick_start = SDL_GetTicks();
     if (!dt)
         dt = 1;
+    if (dt > 48)
+        dt = 48;
 
-    int cycles_per_tick = FOX32_CPU_HZ / TPS / dt;
-    int extra_cycles = FOX32_CPU_HZ / TPS - (cycles_per_tick * dt);
+    rtc_uptime += dt;
+    rtc_time = time(NULL);
+
     int frame_cycles = 0;
 
     fox32_err_t error = FOX32_ERR_OK;
+    int frame_ticks = dt / (1000 / TPS); 
+    if (frame_ticks < 1) frame_ticks = 1;
+    uint32_t total = (FOX32_CPU_HZ / TPS) * frame_ticks;
 
-    for (int i = 0; i < dt; i++) {
-        rtc_uptime += 1;
-        rtc_time = time(NULL);
+    while (total > 0) {
+        uint32_t timeslice = (total < 2048) ? total : 2048;
+        uint32_t executed = 0;
 
-        int cycles_left = cycles_per_tick;
-
-        if (i == dt - 1)
-            cycles_left += extra_cycles;
-
-        while (cycles_left > 0) {
-            uint32_t timeslice = (cycles_left < 2000) ? cycles_left : 2000;
-            uint32_t executed = 0;
-
-            //error = fox32_resume(&vm, cycles_left, &executed);
-            error = fox32_resume(&vm, timeslice, &executed);
-            frame_cycles += executed;
-            sound_sync(executed);
-            timer_sync(vm.instructions);
-            if (error != FOX32_ERR_OK) {
-                if (vm.debug) puts(fox32_strerr(error));
-                error = fox32_recover(&vm, error);
-                if (error != FOX32_ERR_OK)
-                    break;
-            }
-
-            cycles_left -= executed;
+        //error = fox32_resume(&vm, cycles_left, &executed);
+        error = fox32_resume(&vm, timeslice, &executed);
+        frame_cycles += executed;
+        sound_sync(executed);
+        timer_sync(vm.instructions);
+        if (error != FOX32_ERR_OK) {
+            if (vm.debug) puts(fox32_strerr(error));
+            error = fox32_recover(&vm, error);
+            if (error != FOX32_ERR_OK)
+                break;
         }
+        total = (executed >= total) ? 0 : (total - executed);
     }
 
     if ((ticks % TPF) == 0) {

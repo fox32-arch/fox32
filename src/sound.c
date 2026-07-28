@@ -132,9 +132,14 @@ void sound_step() {
             snd.channel[i].data = 0;
         }
         snd.channel[i].last_enable = snd.channel[i].enable;
-        float sum = snd.channel[i].data * ((float)(snd.channel[i].volume & 0x7f) / 127.0f);
-        snd.out_left += (int32_t)(sum * ((float)(snd.channel[i].left_volume) / 255.0f));
-        snd.out_right += (int32_t)(sum * ((float)(snd.channel[i].right_volume) / 255.0f));
+        int32_t sample = snd.channel[i].data;
+        int32_t vol = snd.channel[i].volume & 0x7f; /* 0..127 */
+
+        int32_t left_vol  = (vol * snd.channel[i].left_volume) >> 7; /* 0..255 */
+        int32_t right_vol = (vol * snd.channel[i].right_volume) >> 7;
+
+        snd.out_left  += (sample * left_vol) >> 8;
+        snd.out_right += (sample * right_vol) >> 8;
     }
     int32_t left = snd.out_left >> 1;
     int32_t right = snd.out_right >> 1;
@@ -182,9 +187,19 @@ void sound_sync(uint32_t cycles_executed) {
     frac = total_frac % 1375; /* remainder */
     cycles_pending = 0; /* reset for next frame */
     
+    /* how many buffers in the ring? */
+    uint32_t samples_in_buffer = (write_pos >= read_pos) ? (write_pos - read_pos) / 2 : (48000 - read_pos + write_pos) / 2;
+    uint32_t min_samples = 1600;
+
+    if (samples_in_buffer < min_samples) {
+        generated += (min_samples - samples_in_buffer);
+    }
+
+    SDL_LockAudio();
     for (uint32_t i = 0; i < generated; i++) {
         sound_step();
     }
+    SDL_UnlockAudio();
 }
 
 void sound_init() {
@@ -193,7 +208,7 @@ void sound_init() {
     spec.freq = 48000;
     spec.format = AUDIO_S16SYS;
     spec.channels = 2;
-    spec.samples = 4096;
+    spec.samples = 512;
     spec.callback = sound_callback;
     SDL_OpenAudio(&spec, 0);
     SDL_PauseAudio(0); 
