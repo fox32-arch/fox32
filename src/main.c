@@ -210,6 +210,7 @@ int main(int argc, char *argv[]) {
 #endif
 
     LOG0("beginning execution\n\n");
+    SDL_Thread *disk_worker = start_disk_worker();
 
     while (!done && !bus_requests_exit) {
         main_loop();
@@ -223,6 +224,8 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    exit_disk_worker();
+    SDL_WaitThread(disk_worker, NULL);
     fox32_exit(&vm);
     return 0;
 }
@@ -267,6 +270,11 @@ void main_loop(void) {
                 error = fox32_recover(&vm, error);
                 if (error != FOX32_ERR_OK)
                     break;
+            }
+
+            if (is_disk_interrupt_pending(true)) {
+                fox32_raise(&vm, DISK_INTERRUPT_VECTOR);
+                vm.halted = false;
             }
 
             cycles_left -= executed;
