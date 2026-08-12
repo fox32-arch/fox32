@@ -1,7 +1,6 @@
 #pragma once
 
-#define FOX32_AUDIO_CHANNELS 8
-#define FOX32_AUDIO_BUFFER_SIZE 32768
+#define FOX32_AUDIO_CHANNELS 16
 #define FOX32_AUDIO_BUF0_IRQ 0xFD
 #define FOX32_AUDIO_BUF1_IRQ 0xFE
 
@@ -39,9 +38,9 @@ typedef struct {
     uint32_t buf0_base;
     uint32_t buf1_base;
     uint8_t active_buffer;
-    uint8_t buffer_mode;
-    uint8_t buffer_phase;
-    uint8_t buffer_rate;
+    uint32_t buffer_mode;
+    uint32_t buffer_phase;
+    uint32_t buffer_rate;
     uint32_t buffer_size;
     uint32_t buffer_pos;
 } sound_t;

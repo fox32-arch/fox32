@@ -98,8 +98,6 @@ int bus_io_read(void *user, uint32_t *value, uint32_t port) {
         }
         case 0x80000600 ... 0x80000684: { // audio port
             size_t id = port & 0xFF;
-            uint8_t channel = (id & 0x70) >> 4;
-            uint8_t reg = (id & 0x0F);
             if (id >= 0x80) {
                 switch (id) {
                     case 0x80: {
@@ -133,6 +131,8 @@ int bus_io_read(void *user, uint32_t *value, uint32_t port) {
                     }
                 }
             } else {
+                uint8_t channel = (id >> 3) & 0x0F;
+                uint8_t reg = (id & 0x07);
                 switch (reg) {
                     case 0x0: {
                         // AUDxPOS
@@ -338,8 +338,6 @@ int bus_io_write(void *user, uint32_t value, uint32_t port) {
 
         case 0x80000600 ... 0x80000684: { // audio port
             size_t id = port & 0xFF;
-            uint8_t channel = (id & 0x70) >> 4;
-            uint8_t reg = (id & 0x0F);
             if (id >= 0x80) {
                 switch (id) {
                     case 0x80: {
@@ -353,7 +351,7 @@ int bus_io_write(void *user, uint32_t value, uint32_t port) {
                         if ((value & (1 << 1)) == 0) snd.buf0_refill_pending = false;
                         if ((value & (1 << 2)) == 0) snd.buf1_refill_pending = false;
                         snd.buffer_mode = (value & 0x30) >> 4;
-                        snd.buffer_rate = (value & 0xff00) >> 8;
+                        snd.buffer_rate = (value & 0x1ffff00) >> 8;
                         break;
                     }
                     case 0x82: {
@@ -373,6 +371,8 @@ int bus_io_write(void *user, uint32_t value, uint32_t port) {
                     }
                 }
             } else {
+                uint8_t channel = (id >> 3) & 0x0F;
+                uint8_t reg = (id & 0x07);
                 switch (reg) {
                     case 0x0: {
                         // AUDxSTART

@@ -1,6 +1,6 @@
 # Audio controller
 
-The audio controller manages 8 PCM audio channels, summing them together
+The audio controller manages 16 PCM audio channels, summing them together
 to produce the final audio output. The controller has a maximum output rate
 of 48 kHz and can handle signed 8-bit or signed 16-bit PCM samples from any physical address in memory.
 
@@ -11,8 +11,9 @@ The channel is scaled by the channel volume (0-127), and then by the left and ri
 
 Audio ports can be accessed within the range 0x80000600-0x800006FF.
 
-Registers for the 8 audio channels are accessed at 0x00-0x7F. The upper nibble determines 
-the channel number, while the lower nibble determines the register.
+Registers for the 16 audio channels are accessed at 0x00-0x7F. The upper nibble determines 
+the channel pair (bit 3 of the lower nibble determines whether it is even or odd), while the lower nibble determines the register.
+Each channel block is 8 bytes, although 7 are only used, with the 8th byte reserved for future use.
 
  offset (X = 0...7) | description
 --------------------|------------------
@@ -23,6 +24,18 @@ the channel number, while the lower nibble determines the register.
   0xX4              | audio channel X rate
   0xX5              | audio channel X control
   0xX6              | audio channel X panning
+  0xX7              | (reserved)
+  0xX8              | audio channel X+1 sample start
+  0xX9              | audio channel X+1 sample end
+  0xXA              | audio channel X+1 loop point start
+  0xXB              | audio channel X+1 loop point end
+  0xXC              | audio channel X+1 rate
+  0xXD              | audio channel X+1 control
+  0xXE              | audio channel X+1 panning
+  0xXF              | (reserved)
+
+The port range 0xX8-0xXE have the same functionality as the port range 0xX0-0x06, but they are assigned to the next
+channel.
 
 Registers relating to the current status of the audio controller are located at ports 0x80 and 0x81.
  offset | description
@@ -102,11 +115,11 @@ write to it to set the base.
 
  bits   | description
 --------|------------------
-  15:8  | buffer rate
+  24:8  | buffer rate
   5:4   | buffer format
   2     | buffer 1 refill pending flag
   1     | buffer 0 refill pending flag
-  0     | buffer mode (0=use channels, 1=use buffer)
+  0     | buffer mode (0=disable buffer, 1=enable buffer)
 
 During a refill interrupt, a 0 should be written to the corresponding buffer refill pending flag. This can be done with
 the following:
@@ -121,14 +134,14 @@ bcl r0, 2
 out 0x80000681, r0
 ```
 
-Bits 15 to 8 specify the rate at which samples are fetched from the buffer. The formula for calculating
-the rate for a given sample rate (F) is $\frac{F}{48000}\times2^{7}$. A value of 0 halts the internal counter and
+Bits 24 to 8 specify the rate at which samples are fetched from the buffer. The formula for calculating
+the rate for a given sample rate (F) is $\frac{F}{48000}\times2^{16}$. A value of 0 halts the internal counter and
 no samples are fetched until a non-zero rate is set.
   value    | description
 -----------|--------------------
-  128      | maximum rate (48 kHz)
-  64       | half rate (24 kHz)
-  32       | quarter rate (12 kHz)
+  65536    | maximum rate (48 kHz)
+  32768    | half rate (24 kHz)
+  16384    | quarter rate (12 kHz)
   0        | stops playback
   \>128    | undefined behaviour
 
@@ -155,11 +168,10 @@ Read from this register to get the size of the audio buffer (or to be more preci
 Write to this register to set the size of the audio buffer. This register sets the length of both buffer 0 and 1.
 
 ## Buffer mode
-When buffer mode is enabled, the audio controller disables usage of the 8 sample channels and uses 2 buffers (Buffer 0 and Buffer 1)
-to output samples. When the controller starts reading samples, it will read Buffer 0 first. When it has reached the end of Buffer 0,
-it will interrupt to the CPU to refill Buffer 0 (vector 0xFD), while it starts reading Buffer 1. When it reaches the end of Buffer 1, 
-it will also interrupt the CPU to refill Buffer 1 (vector 0xFE), and restarts reading from Buffer 0. The start address for Buffer 0 is
-determined by port 0x82, and 0x83 for Buffer 1. The length of these buffers is set by port 0x84.
+When buffer mode is enabled, the audio controller enables an extra 9th channel that uses 2 buffers (Buffer 0 and Buffer 1) to output samples. When the controller starts
+reading samples, it will read Buffer 0 first. When it has reached the end of Buffer 0, it will interrupt to the CPU to refill Buffer 0 (vector 0xFD), 
+while it starts reading Buffer 1. When it reaches the end of Buffer 1,  it will also interrupt the CPU to refill Buffer 1 (vector 0xFE), and restarts 
+reading from Buffer 0. The start address for Buffer 0 is determined by port 0x82, and 0x83 for Buffer 1. The length of these buffers is set by port 0x84.
 
 Stereo samples are fetched as frames containing left and right samples. For example, if the buffer is set to stereo 8-bit PCM,
 it fetches the left sample first (1 byte), then the right sample last (1 byte), advancing the internal position by 2 bytes.

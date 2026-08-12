@@ -21,9 +21,9 @@ static uint32_t cycles_pending = 0;
 void sound_step() {
     /* manual mixing */
     if (snd.buffer) {
-        uint8_t old_phase = snd.buffer_phase;
         snd.buffer_phase += snd.buffer_rate;
-        if ((old_phase & 0x80) != (snd.buffer_phase & 0x80)) {
+        if (snd.buffer_phase >= (1 << 16)) {
+            snd.buffer_phase -= (1 << 16);
             uint32_t curr_base = (snd.active_buffer == 0) ? snd.buf0_base : snd.buf1_base;
             uint32_t abs = curr_base + snd.buffer_pos;
             switch (snd.buffer_mode & 3) {
@@ -73,25 +73,13 @@ void sound_step() {
                 }
             }
         }
-        
-        int32_t left = snd.out_left >> 1;
-        int32_t right = snd.out_right >> 1;
-        /* clamp the audio so we don't overflow */
-        if (left > 32767) left = 32767;
-        if (left < -32768) left = -32768;
-            
-        if (right > 32767) right = 32767;
-        if (right < -32768) right = -32768;
-
-        ring_buffer[write_pos++] = (int16_t)left;
-        ring_buffer[write_pos++] = (int16_t)right;
-        write_pos %= 48000;
-        return;
     }
     
     /* auto-channels */
-    snd.out_left = 0;
-    snd.out_right = 0;
+    if (!snd.buffer) {
+        snd.out_left = 0;
+        snd.out_right = 0;
+    }
     for (int i=0; i<FOX32_AUDIO_CHANNELS; i++) {
         if (snd.channel[i].enable && !snd.channel[i].last_enable) {
             snd.channel[i].position = snd.channel[i].start;
@@ -132,9 +120,14 @@ void sound_step() {
             snd.channel[i].data = 0;
         }
         snd.channel[i].last_enable = snd.channel[i].enable;
-        float sum = snd.channel[i].data * ((float)(snd.channel[i].volume & 0x7f) / 127.0f);
-        snd.out_left += (int32_t)(sum * ((float)(snd.channel[i].left_volume) / 255.0f));
-        snd.out_right += (int32_t)(sum * ((float)(snd.channel[i].right_volume) / 255.0f));
+        int32_t sample = snd.channel[i].data;
+        int32_t vol = snd.channel[i].volume & 0x7f; /* 0..127 */
+
+        int32_t left_vol  = (vol * snd.channel[i].left_volume) >> 7; /* 0..255 */
+        int32_t right_vol = (vol * snd.channel[i].right_volume) >> 7;
+
+        snd.out_left  += (sample * left_vol) >> 8;
+        snd.out_right += (sample * right_vol) >> 8;
     }
     int32_t left = snd.out_left >> 1;
     int32_t right = snd.out_right >> 1;
