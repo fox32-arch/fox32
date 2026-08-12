@@ -168,7 +168,7 @@ Read from this register to get the size of the audio buffer (or to be more preci
 Write to this register to set the size of the audio buffer. This register sets the length of both buffer 0 and 1.
 
 ## Buffer mode
-When buffer mode is enabled, the audio controller enables an extra 9th channel that uses 2 buffers (Buffer 0 and Buffer 1) to output samples. When the controller starts
+When buffer mode is enabled, the audio controller enables an extra channel that uses 2 buffers (Buffer 0 and Buffer 1) to output samples. When the controller starts
 reading samples, it will read Buffer 0 first. When it has reached the end of Buffer 0, it will interrupt to the CPU to refill Buffer 0 (vector 0xFD), 
 while it starts reading Buffer 1. When it reaches the end of Buffer 1,  it will also interrupt the CPU to refill Buffer 1 (vector 0xFE), and restarts 
 reading from Buffer 0. The start address for Buffer 0 is determined by port 0x82, and 0x83 for Buffer 1. The length of these buffers is set by port 0x84.
