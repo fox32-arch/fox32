@@ -1,4 +1,5 @@
-# fox32
+# fox32 has moved to Codeberg! [https://codeberg.org/fox32-arch](https://codeberg.org/fox32-arch)
+This repository will no longer be updated.
 
 ![fox32 logo](docs/logos/fox32-circle.png)  
 (logo by [Zenith302](https://zencorner.xyz/contacts.html))
